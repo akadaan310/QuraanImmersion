@@ -1,22 +1,51 @@
 /**
- * BahraynHUD — live readout and controls for the two clock seas.
+ * BahraynHUD — a readout of the two clock seas. It contains no inputs.
  *
- * One control per sea (lambda), and one number that matters more than any of
- * them: `barrierViolations`. That count is the running proof of لا يبغيان — it
- * is recomputed from the live coordinate arrays every report, and if it ever
- * leaves zero the two seas have mixed and the whole model has failed. It is
- * shown to the observer rather than hidden in a test.
+ * Every number here is derived: each sea's lambda comes from the Isnaad vectors
+ * that correspond to it, its clock wells come from the recitation's onsets, and
+ * the upper sea's link state comes from real round trips to the deployed
+ * endpoint. Nothing on this panel can be adjusted, because nothing about the
+ * experience is adjustable — it follows the recitation.
+ *
+ * Two of these numbers matter more than the rest:
+ *
+ *   barrierViolations  the running proof of لا يبغيان. Recomputed from the live
+ *                      coordinate arrays every report; if it ever leaves zero
+ *                      the seas have mixed and the model has failed. It is
+ *                      shown rather than hidden in a test.
+ *
+ *   rttMs              the upper sea's real distance. Its clocks make an actual
+ *                      round trip through the deployment, and this is how long
+ *                      that took — not a decoration.
  */
+
+import { useEffect, useState } from 'react';
 
 import { PHASE_LABEL, Phase } from '@/hypermath/dilation';
 import { SEA_LABEL, type SeaId, type SeaStats } from '@/hypermath/DualSea';
+import { continuumStats, drivenLambda, upperLink } from '@/hypermath/continuum';
+import type { LinkState } from '@/services/UpperSeaSync';
 import { toArabicNumerals } from '@/data/surahs';
-import { useSession } from '@/state/store';
+import type { DualSeaStats } from '@/hypermath/DualSea';
 
 const PHASE_COLOR: Record<Phase, string> = {
   [Phase.SubCritical]: '#22d3ee',
   [Phase.Collapse]: '#818cf8',
   [Phase.SuperCritical]: '#fbbf24',
+};
+
+const LINK_LABEL: Record<LinkState, string> = {
+  idle: 'في انتظار أول إطار',
+  live: 'متصل — الساعات العليا تعبر السحابة',
+  degraded: 'اضطراب في الوصلة — البحر يواصل محلياً',
+  offline: 'الوصلة منقطعة — البحر يواصل محلياً',
+};
+
+const LINK_COLOR: Record<LinkState, string> = {
+  idle: '#64748b',
+  live: '#34d399',
+  degraded: '#fbbf24',
+  offline: '#f87171',
 };
 
 /** Compact scientific rendering; log-rates reach 1e6 and beyond. */
@@ -27,25 +56,15 @@ function sci(value: number): string {
   return value.toExponential(2);
 }
 
-function SeaPanel({ id, stats }: { id: SeaId; stats: SeaStats | null }) {
-  const lambda = useSession((s) => (id === 'lower' ? s.lambdaLower : s.lambdaUpper));
-  const setLambda = useSession((s) => s.setLambda);
-  const lastTapSea = useSession((s) => s.lastTapSea);
-  const tapCounter = useSession((s) => s.tapCounter);
-
+function SeaPanel({ id, stats, lambda }: { id: SeaId; stats: SeaStats | null; lambda: number }) {
   const phase = stats?.phase ?? Phase.SubCritical;
   const accent = PHASE_COLOR[phase];
-  const justTapped = lastTapSea === id;
+  // A bar, not a slider: it reports where the recitation has driven lambda.
+  const sweep = Math.min(Math.max((lambda - 0.5) / 5.0, 0), 1);
+  const criticalAt = (3.0 - 0.5) / 5.0;
 
   return (
-    <div
-      className="rounded-md border p-3 transition"
-      style={{
-        borderColor: `${accent}55`,
-        boxShadow: justTapped ? `0 0 22px -8px ${accent}` : undefined,
-      }}
-      key={`${id}-${justTapped ? tapCounter : 0}`}
-    >
+    <div className="rounded-md border p-3" style={{ borderColor: `${accent}55` }}>
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="font-naskh text-sm text-slate-100">{SEA_LABEL[id]}</h3>
         <span className="font-kufi text-[10px]" style={{ color: accent }}>
@@ -53,26 +72,21 @@ function SeaPanel({ id, stats }: { id: SeaId; stats: SeaStats | null }) {
         </span>
       </div>
 
-      <label className="mt-3 block">
-        <span className="flex items-baseline justify-between">
+      <div className="mt-3">
+        <div className="flex items-baseline justify-between">
           <span className="hud-label">معامل القيمة الذاتية λ</span>
           <span className="font-mono text-[11px]" style={{ color: accent }} dir="ltr">
             {lambda.toFixed(2)}
           </span>
-        </span>
-        <input
-          type="range"
-          min={0.1}
-          max={6}
-          step={0.01}
-          value={lambda}
-          onChange={(event) => setLambda(id, Number(event.target.value))}
-          className="mt-1 w-full"
-          style={{ accentColor: accent }}
-          dir="ltr"
-          aria-label={`${SEA_LABEL[id]} — λ`}
-        />
-      </label>
+        </div>
+        <div className="relative mt-1 h-[6px] w-full overflow-hidden rounded-full bg-slate-800">
+          <i className="absolute inset-y-0 right-0 block rounded-full transition-[width] duration-150"
+             style={{ width: `${sweep * 100}%`, background: accent }} />
+          {/* The critical threshold, marked in place so the crossing is visible. */}
+          <span className="absolute inset-y-0 w-px bg-white/50"
+                style={{ right: `${criticalAt * 100}%` }} aria-hidden />
+        </div>
+      </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 font-kufi text-[10px] text-slate-400">
         <dt>أقصى لوغاريتم الزمن</dt>
@@ -87,11 +101,7 @@ function SeaPanel({ id, stats }: { id: SeaId; stats: SeaStats | null }) {
         <dd className="text-left font-mono" dir="ltr">
           {stats ? toArabicNumerals(stats.frozen) : '—'}
         </dd>
-        <dt>عقد منفردة</dt>
-        <dd className="text-left font-mono" dir="ltr">
-          {stats ? toArabicNumerals(stats.singular) : '—'}
-        </dd>
-        <dt>نقرات</dt>
+        <dt>آبار مفتوحة</dt>
         <dd className="text-left font-mono" dir="ltr">
           {stats ? toArabicNumerals(stats.taps) : '—'}
         </dd>
@@ -108,12 +118,21 @@ function SeaPanel({ id, stats }: { id: SeaId; stats: SeaStats | null }) {
 }
 
 export function BahraynHUD() {
-  const seaStats = useSession((s) => s.seaStats);
-  const phenomenon = useSession((s) => s.phenomenon);
+  const [seaStats, setSeaStats] = useState<DualSeaStats | null>(null);
+  const [lambda, setLambda] = useState({ lower: 1, upper: 1 });
+  const [link, setLink] = useState(() => ({ ...upperLink() }));
 
-  // The continuum only runs inside its own scene; showing stale numbers
-  // elsewhere would be worse than showing none.
-  if (phenomenon !== 'marj-bahrayn') return null;
+  // All three change at frame or network rate. None belongs in the store, so
+  // they are sampled here at reading speed — which also means this readout is
+  // correct in every scene, since the continuum is global.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setSeaStats(continuumStats());
+      setLambda(drivenLambda());
+      setLink({ ...upperLink() });
+    }, 180);
+    return () => window.clearInterval(id);
+  }, []);
 
   const violations = seaStats?.barrierViolations ?? 0;
   const intact = violations === 0;
@@ -130,14 +149,32 @@ export function BahraynHUD() {
       </header>
 
       <p className="mt-2 font-kufi text-[10px] leading-relaxed text-slate-500">
-        انقر على أيّ بحر لفتح بئر ساعات فيه. أثر النقرة يتبع طور ذلك البحر وحده،
-        ولا يعبر البرزخ.
+        البحران يتبعان التلاوة وحدها: λ من متجهات الإسناد، وآبار الساعات من نبضات الصوت.
       </p>
 
       <div className="mt-3 space-y-3">
-        <SeaPanel id="upper" stats={seaStats?.upper ?? null} />
+        <SeaPanel id="upper" stats={seaStats?.upper ?? null} lambda={lambda.upper} />
 
-        {/* البرزخ — the live invariant, between the two panels where it belongs. */}
+        {/* The link the upper sea's clocks actually travel over. */}
+        <div className="rounded-md border px-3 py-2"
+             style={{ borderColor: `${LINK_COLOR[link.state]}44` }}>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="font-kufi text-[10px]" style={{ color: LINK_COLOR[link.state] }}>
+              {LINK_LABEL[link.state]}
+            </span>
+            <span className="font-mono text-[10px] text-slate-400" dir="ltr">
+              {link.state === 'live' ? `${link.rttMs.toFixed(0)} ms` : '—'}
+            </span>
+          </div>
+          {link.state === 'live' && (
+            <p className="mt-1 font-mono text-[9px] text-slate-600" dir="ltr">
+              {toArabicNumerals(link.acked)} frames · {link.ratio.toFixed(2)}x
+              {link.region ? ` · ${link.region}` : ''}
+            </p>
+          )}
+        </div>
+
+        {/* البرزخ — the live invariant, between the two seas where it belongs. */}
         <div
           className="rounded-md border px-3 py-2 text-center"
           style={{
@@ -157,7 +194,7 @@ export function BahraynHUD() {
           </p>
         </div>
 
-        <SeaPanel id="lower" stats={seaStats?.lower ?? null} />
+        <SeaPanel id="lower" stats={seaStats?.lower ?? null} lambda={lambda.lower} />
       </div>
     </section>
   );

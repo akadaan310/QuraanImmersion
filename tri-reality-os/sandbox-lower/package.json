@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "SANDBOX-LOWER: local Termux runtime bridge to SANDBOX-UPPER (Vercel).",
-  "engines": { "node": ">=20.0.0" },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "daemon": "node upper_sync_daemon.js",
     "test": "node --test tests/",

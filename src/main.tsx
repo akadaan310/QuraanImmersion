@@ -6,6 +6,7 @@ import App from './App';
 import { bindEngineToSession } from '@/state/store';
 import { audioEngine } from '@/audio/AudioEngine';
 import { isnaadEngine } from '@/engine/isnaad/IsnaadEngine';
+import { continuum, upperLink } from '@/hypermath/continuum';
 import './index.css';
 
 // One subscription for the page lifetime: AudioEngine events → session store.
@@ -19,10 +20,17 @@ bindEngineToSession();
  */
 declare global {
   interface Window {
-    __ISNAAD__?: { audioEngine: typeof audioEngine; isnaadEngine: typeof isnaadEngine };
+    __ISNAAD__?: {
+      audioEngine: typeof audioEngine;
+      isnaadEngine: typeof isnaadEngine;
+      continuum: typeof continuum;
+    };
+    /** Live upper-sea link state, for the verification harness and the console. */
+    __ISNAAD_LINK__?: typeof upperLink;
   }
 }
-window.__ISNAAD__ = { audioEngine, isnaadEngine };
+window.__ISNAAD__ = { audioEngine, isnaadEngine, continuum };
+window.__ISNAAD_LINK__ = upperLink;
 
 const container = document.getElementById('root');
 if (!container) throw new Error('root container missing');

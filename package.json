@@ -13,8 +13,9 @@
     "verify": "npm run verify:no-translation && tsc -b && vitest run",
     "verify:scenes": "node scripts/verify-scenes.mjs",
     "verify:audio": "node scripts/verify-audio.mjs",
-    "verify:all": "npm run verify && npm run build && npm run verify:scenes && npm run verify:audio",
-    "test": "vitest run"
+    "verify:all": "npm run verify && npm run build && npm run verify:scenes && npm run verify:upper && npm run verify:audio",
+    "test": "vitest run",
+    "verify:upper": "node scripts/verify-upper-sea.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.3",

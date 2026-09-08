@@ -88,7 +88,10 @@ test('summarizeLogTau reduces in log space and never returns Infinity', async ()
 
   const s = summarizeLogTau(payload);
   assert.equal(s.count, n);
-  assert.equal(s.frozen, 1);
+  // Renamed from `frozen`: ln(tau) = -Infinity means tau = 0, which is true of
+  // a stopped clock AND of one that has not started. The frame carries no rate
+  // array, so the endpoint counts "reading zero" and claims nothing more.
+  assert.equal(s.atZero, 1);
   assert.equal(s.finite, n - 1);
   assert.ok(Number.isFinite(s.logTauMax), 'logTauMax must stay finite');
   assert.ok(Number.isFinite(s.logTauSum), 'log-sum-exp must stay finite');

@@ -14,7 +14,6 @@ import { DEFAULT_RECITER, type ReciterId } from '@/data/reciters';
 import { DEFAULT_PHENOMENON, PHENOMENON_BY_ID, type PhenomenonId } from '@/data/phenomena';
 import { clampVerse, nextVerse, prevVerse, PRIMARY_PROCESSING_CORE } from '@/data/surahs';
 import { loadSurahText } from '@/services/QuranTextService';
-import type { DualSeaStats, SeaId } from '@/hypermath/DualSea';
 
 const CALIBRATION_KEY = 'isnaad.calibration.v1';
 
@@ -52,21 +51,6 @@ export interface SessionState {
   textError: string | null;
   textLoading: boolean;
 
-  /**
-   * مرج البحرين — the two clock seas.
-   *
-   * Each sea carries its OWN lambda and therefore its own phase, so the two can
-   * sit in different regimes at the same instant: one running uniform time,
-   * one collapsed, one racing inward. They are stored separately here for the
-   * same reason they are simulated separately — nothing may couple them.
-   */
-  lambdaLower: number;
-  lambdaUpper: number;
-  /** Live telemetry from the continuum, republished at ~6 Hz. */
-  seaStats: DualSeaStats | null;
-  /** Which sea was last tapped, and a counter to drive the UI pulse. */
-  lastTapSea: SeaId | null;
-  tapCounter: number;
 
   setReciter: (id: ReciterId) => void;
   selectVerse: (surah: number, ayah: number) => void;
@@ -85,9 +69,6 @@ export interface SessionState {
   resetCalibration: () => void;
   ingestText: (surah: number) => void;
 
-  setLambda: (sea: SeaId, value: number) => void;
-  setSeaStats: (stats: DualSeaStats) => void;
-  registerTap: (sea: SeaId) => void;
 }
 
 export const useSession = create<SessionState>((set, get) => ({
@@ -112,13 +93,6 @@ export const useSession = create<SessionState>((set, get) => ({
   textError: null,
   textLoading: false,
 
-  // Both seas open sub-critical, so the first thing an observer sees is
-  // uniform time — the baseline the other two phases are departures from.
-  lambdaLower: 1.0,
-  lambdaUpper: 1.0,
-  seaStats: null,
-  lastTapSea: null,
-  tapCounter: 0,
 
   setReciter: (id) => {
     const { surah, ayah, playing } = get();
@@ -204,18 +178,6 @@ export const useSession = create<SessionState>((set, get) => ({
     }
     set({ calibrated: false });
   },
-
-  setLambda: (sea, value) => {
-    // Clamped to the sweep the three-phase model is defined on. The collapse
-    // band sits at 3.0 +/- 0.02, so a control stepping by 0.01 cannot skip it.
-    const clamped = Math.min(Math.max(value, 0.1), 6.0);
-    set(sea === 'lower' ? { lambdaLower: clamped } : { lambdaUpper: clamped });
-  },
-
-  setSeaStats: (stats) => set({ seaStats: stats }),
-
-  registerTap: (sea) =>
-    set((state) => ({ lastTapSea: sea, tapCounter: state.tapCounter + 1 })),
 
   ingestText: (surah) => {
     set({ textLoading: true, textError: null });

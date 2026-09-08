@@ -15,6 +15,7 @@ import * as THREE from 'three';
 
 import { audioEngine } from '@/audio/AudioEngine';
 import { isnaadEngine } from '@/engine/isnaad/IsnaadEngine';
+import { advanceContinuum } from '@/hypermath/continuum';
 
 /** Radius of the crystal boundary; observer proximity is measured against it. */
 export const CORE_RADIUS = 3.2;
@@ -27,7 +28,7 @@ export function EngineDriver({ core = new THREE.Vector3(0, 0, 0) }: { core?: THR
   const toCore = useRef(new THREE.Vector3());
   const agitation = useRef(0);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const frame = audioEngine.analyse();
     const dt = frame.dt || 1 / 60;
 
@@ -55,6 +56,20 @@ export function EngineDriver({ core = new THREE.Vector3(0, 0, 0) }: { core?: THR
     });
 
     isnaadEngine.update(frame);
+
+    // The two clock seas advance last in this callback, because they read both
+    // the audio frame and the Isnaad array this frame produced. They run in
+    // every scene, not only in مرج البحرين, so the clocks are one continuum
+    // rather than a per-scene prop.
+    //
+    // They are advanced by R3F's REAL elapsed delta, not by the audio frame's
+    // dt. frame.dt is derived from the AudioContext clock and is 0 until a user
+    // gesture opens one, so the `|| 1/60` fallback above silently measures time
+    // in FRAMES: on a slow renderer the seas would drift far behind wall-clock
+    // and the whole point of a live sync would be lost. Clamped, because a
+    // backgrounded tab returns a delta of many seconds and would otherwise
+    // jump the clocks forward in one step.
+    advanceContinuum(Math.min(delta, 1 / 15));
   }, -1000);
 
   return null;

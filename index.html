@@ -1,9 +1,28 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" translate="no" class="notranslate">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#030712" />
+
+    <!--
+      TRANSLATION LOCKDOWN.
+
+      lang="ar" invites Chrome to offer a translation, and a user with
+      auto-translate enabled for Arabic gets the ENTIRE document rewritten -
+      the Uthmani text and the Basmala included. Observed in production:
+      the Basmala rendered as English prose, and الرتق والفتق rendered as
+      "Atresia and hernia" (رتق = atresia, فتق = hernia) - a medical
+      machine-translation of a Quranic term.
+
+      QuranTextService.assertArabicOnly guards what ENTERS the app; nothing in
+      JavaScript can guard what the browser does to the DOM afterwards. These
+      three declarations are the only mechanism that can, and all three are
+      needed: Chrome honours the meta, Safari and Edge honour the attribute,
+      and the class is what older Google Translate widgets read.
+    -->
+    <meta name="google" content="notranslate" />
+    <meta name="robots" content="notranslate" />
     <title>محرك الإسناد المعرفي الانغماسي</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,7 +32,7 @@
     />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" translate="no" class="notranslate"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

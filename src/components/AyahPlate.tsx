@@ -40,7 +40,10 @@ export function AyahPlate({ surah, ayah, accent }: { surah: number; ayah: number
   const showBasmala = ayah === 1 && surah !== 9 && surah !== 1;
 
   return (
-    <section className="hud-panel px-6 py-5" aria-label="نص الآية">
+    // translate="no" + notranslate repeat the document-level lockdown at the one
+    // element that must never be rewritten. Chrome was observed translating the
+    // Basmala here in production; belt and braces is warranted for this node.
+    <section className="hud-panel px-6 py-5 notranslate" translate="no" aria-label="نص الآية">
       <header className="flex items-baseline justify-between gap-4">
         <h2 className="font-uthmani text-xl text-slate-100">
           سورة {definition.name}

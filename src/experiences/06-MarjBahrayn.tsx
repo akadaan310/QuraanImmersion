@@ -17,27 +17,25 @@
  * hammering one sea with taps leaves the other's tau BIT-IDENTICAL to a control
  * run.
  *
- * TAP: pointer or touch anywhere on a sea opens a clock well there. The same
- * gesture does opposite things depending on that sea's phase —
- *   sub-critical  nothing (uniform flow admits no local dilation)
- *   collapse      the well FREEZES its neighbourhood (density crosses rho_crit)
- *   super-critical the well ACCELERATES it without bound (radius -> 0)
- * which is the clearest way to feel the three-phase lifecycle by hand.
+ * NO CONTROLS, NO TOUCH. The seas are not driven from this component at all.
+ * `@/hypermath/continuum` advances one global continuum inside EngineDriver,
+ * giving each sea its lambda from the Isnaad vectors that already correspond to
+ * it and opening clock wells on the recitation's own onsets. This scene is
+ * purely a view onto clocks that are already running — which is why the same
+ * clocks are live in every other scene too.
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { GLSL_PRELUDE } from '@/shaders/common';
 import { useEngineUniforms } from '@/engine/uniforms';
-import { audioEngine } from '@/audio/AudioEngine';
-import {
-  DualSeaContinuum, BARRIER_HALF_WIDTH, BASIN_EXTENT,
-} from '@/hypermath/DualSea';
-import { useSession } from '@/state/store';
+import { BARRIER_HALF_WIDTH, BASIN_EXTENT } from '@/hypermath/DualSea';
+import { continuum } from '@/hypermath/continuum';
 import type { SceneProps } from './types';
 
+/** Must match the grid the global continuum was built with. */
 const GRID = 72;
 
 const vertexShader = /* glsl */ `
@@ -184,15 +182,11 @@ function makeSeaTexture(payload: Float32Array<ArrayBuffer>, size: number): THREE
 }
 
 export function MarjBahraynScene({ accent }: SceneProps) {
-  const lambdaLower = useSession((s) => s.lambdaLower);
-  const lambdaUpper = useSession((s) => s.lambdaUpper);
-  const setSeaStats = useSession((s) => s.setSeaStats);
-  const registerTap = useSession((s) => s.registerTap);
-
-  const continuum = useMemo(() => new DualSeaContinuum(GRID, GRID), []);
-
-  const lowerTex = useMemo(() => makeSeaTexture(continuum.lower.texture, GRID), [continuum]);
-  const upperTex = useMemo(() => makeSeaTexture(continuum.upper.texture, GRID), [continuum]);
+  // The textures are views onto the GLOBAL continuum's payload buffers. No copy
+  // is made and no second simulation exists: this scene renders the same clocks
+  // that EngineDriver is advancing for every other scene.
+  const lowerTex = useMemo(() => makeSeaTexture(continuum.lower.texture, GRID), []);
+  const upperTex = useMemo(() => makeSeaTexture(continuum.upper.texture, GRID), []);
 
   const uniforms = useEngineUniforms(accent, () => ({
     uLowerTex: { value: lowerTex },
@@ -203,56 +197,25 @@ export function MarjBahraynScene({ accent }: SceneProps) {
     uUpperPhase: { value: 0 },
   }));
 
-  useEffect(() => {
-    continuum.setLambda('lower', lambdaLower);
-  }, [continuum, lambdaLower]);
-
-  useEffect(() => {
-    continuum.setLambda('upper', lambdaUpper);
-  }, [continuum, lambdaUpper]);
-
   useEffect(() => () => {
     lowerTex.dispose();
     upperTex.dispose();
   }, [lowerTex, upperTex]);
 
-  const sinceReport = useRef(0);
-
-  useFrame((_, delta) => {
-    const frame = audioEngine.frame;
-
-    // The recitation drives the global tick: coordinate time advances with the
-    // voice, and each sea converts it into its own proper time.
-    const dt = Math.min(delta, 1 / 20) * (0.35 + frame.level * 1.6);
-    continuum.step(dt);
+  useFrame(() => {
+    // The continuum is stepped by EngineDriver at priority -1000, so by the time
+    // this runs the clocks have already advanced. All that remains is to upload
+    // them.
     continuum.writeTextures();
     lowerTex.needsUpdate = true;
     upperTex.needsUpdate = true;
 
     uniforms.uLowerPhase.value = continuum.lower.stats(0).phase;
     uniforms.uUpperPhase.value = continuum.upper.stats(0).phase;
-
-    // Publish to the HUD at ~6 Hz. Stats walk both grids, so doing it every
-    // frame would cost more than the simulation it reports on.
-    sinceReport.current += delta;
-    if (sinceReport.current > 0.16) {
-      sinceReport.current = 0;
-      setSeaStats(continuum.stats());
-    }
   });
 
-  const handleTap = (event: { stopPropagation: () => void; uv?: THREE.Vector2 }) => {
-    event.stopPropagation();
-    if (!event.uv) return;
-    const x = (event.uv.x * 2 - 1) * BASIN_EXTENT;
-    const y = (event.uv.y * 2 - 1) * BASIN_EXTENT;
-    const sea = continuum.tap(x, y, 1.6);
-    // A tap inside the برزخ returns null — nothing exists there to disturb.
-    if (sea) registerTap(sea);
-  };
-
   return (
-    <mesh onPointerDown={handleTap} scale={1.9}>
+    <mesh scale={1.9}>
       <planeGeometry args={[2 * BASIN_EXTENT, 2 * BASIN_EXTENT, 256, 256]} />
       <shaderMaterial
         uniforms={uniforms}
