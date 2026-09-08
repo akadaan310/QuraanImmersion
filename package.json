@@ -1,0 +1,41 @@
+{
+  "name": "isnaad-cognitive-immersion-engine",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "محرك الانغماس الإسنادي المعرفي — real-time WebGL spatial rendering environment driven by ayah-level Quranic recitation.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc -b --noEmit false --pretty",
+    "verify:no-translation": "node scripts/check-no-translation.mjs",
+    "verify": "npm run verify:no-translation && tsc -b",
+    "verify:scenes": "node scripts/verify-scenes.mjs",
+    "verify:audio": "node scripts/verify-audio.mjs",
+    "verify:all": "npm run verify && npm run build && npm run verify:scenes && npm run verify:audio"
+  },
+  "dependencies": {
+    "@react-three/drei": "^9.114.3",
+    "@react-three/fiber": "^8.17.10",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.27.0",
+    "three": "^0.169.0",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.169.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "playwright": "^1.63.0",
+    "pngjs": "^7.0.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
