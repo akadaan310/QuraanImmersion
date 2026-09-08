@@ -10,10 +10,11 @@
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc -b --noEmit false --pretty",
     "verify:no-translation": "node scripts/check-no-translation.mjs",
-    "verify": "npm run verify:no-translation && tsc -b",
+    "verify": "npm run verify:no-translation && tsc -b && vitest run",
     "verify:scenes": "node scripts/verify-scenes.mjs",
     "verify:audio": "node scripts/verify-audio.mjs",
-    "verify:all": "npm run verify && npm run build && npm run verify:scenes && npm run verify:audio"
+    "verify:all": "npm run verify && npm run build && npm run verify:scenes && npm run verify:audio",
+    "test": "vitest run"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.3",
@@ -36,6 +37,7 @@
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "vitest": "^2.1.9"
   }
 }

@@ -15,6 +15,7 @@ import { AyahPlate } from '@/components/AyahPlate';
 import { ReciterSwitcher } from '@/components/ReciterSwitcher';
 import { SurahAyahSelector } from '@/components/SurahAyahSelector';
 import { ExperiencePicker } from '@/components/ExperiencePicker';
+import { BahraynHUD } from '@/components/BahraynHUD';
 import { TransportBar } from '@/components/TransportBar';
 import { PHENOMENON_BY_ID } from '@/data/phenomena';
 import { useSession } from '@/state/store';
@@ -83,8 +84,9 @@ export function ImmersionRoute() {
           </aside>
 
           {/* Left rail: state readout and the phenomenon index. */}
-          <aside className="absolute left-4 top-24 bottom-40 flex w-72 flex-col gap-3 overflow-hidden">
+          <aside className="absolute left-4 top-24 bottom-40 flex w-72 flex-col gap-3 overflow-y-auto pr-1">
             <IsnaadHUD accent={definition.accent} />
+            <BahraynHUD />
             <ExperiencePicker />
           </aside>
         </>
