@@ -47,6 +47,24 @@ npm run build          # typecheck + production bundle
 npm run preview        # serve the build on :4173
 ```
 
+### On a phone — Termux CLI, Samsung 16 Edition
+
+The engine also runs entirely on an Android device, built and served from Termux
+and rendered by the phone's own browser, with a bridge in both directions: the
+terminal drives the running scene, and the page reaches the device (wake lock,
+haptics, battery, TTS) — plus, where the device is already rooted, the four
+system settings that decide whether a long WebGL session survives One UI at all.
+
+```bash
+bash termux/install.sh
+isnaad up                 # build, serve, open Samsung Internet, hold the wake lock
+isnaad play 18 60         # drive the open page from the terminal
+isnaad watch              # the live six-vector, rendered in the terminal
+isnaad root takeover      # uses existing root; recorded and reversible
+```
+
+See [`termux/README.md`](termux/README.md).
+
 ### Verification
 
 ```bash

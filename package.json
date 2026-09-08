@@ -14,7 +14,10 @@
     "verify:scenes": "node scripts/verify-scenes.mjs",
     "verify:audio": "node scripts/verify-audio.mjs",
     "verify:all": "npm run verify && npm run build && npm run verify:scenes && npm run verify:audio",
-    "test": "vitest run"
+    "test": "vitest run",
+    "termux:test": "node --test termux/tests/bridge.test.mjs",
+    "termux:up": "termux/bin/isnaad up",
+    "termux:doctor": "termux/bin/isnaad doctor"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.3",

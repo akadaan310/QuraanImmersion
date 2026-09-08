@@ -1,0 +1,301 @@
+#!/usr/bin/env bash
+#
+#   محرك الإسناد المعرفي الانغماسي — Termux CLI
+#   Isnaad-Cognitive Immersion Engine · Android / Samsung 16 Edition
+#
+# One command drives the whole thing:
+#
+#   isnaad up                 build if needed, serve, open the browser, hold the
+#                             wake lock — the phone becomes both host and client
+#   isnaad play 18 60         drive the page that is already open, from here
+#   isnaad watch              the live six-vector, rendered in the terminal
+#   isnaad root takeover      use the device's existing root to remove the four
+#                             OS-level obstacles the engine actually hits
+#
+# The CLI never assumes root and never requires it. Everything except the
+# `root` subcommand works on a stock, unrooted Galaxy.
+#
+# Written for bash. Termux ships bash as its login shell; `termux-exec` (present
+# by default) makes the /usr/bin/env shebang above resolve correctly. If it does
+# not, run `termux-fix-shebang termux/bin/isnaad` once — or invoke it as
+# `bash termux/bin/isnaad`.
+
+set -uo pipefail
+
+ISNAAD_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ISNAAD_SELF="$(dirname "$ISNAAD_BIN")"
+
+# shellcheck source=../lib/common.sh
+. "$ISNAAD_SELF/lib/common.sh"
+# shellcheck source=../lib/root.sh
+. "$ISNAAD_SELF/lib/root.sh"
+# shellcheck source=../lib/browser.sh
+. "$ISNAAD_SELF/lib/browser.sh"
+# shellcheck source=../lib/doctor.sh
+. "$ISNAAD_SELF/lib/doctor.sh"
+# shellcheck source=../lib/serve.sh
+. "$ISNAAD_SELF/lib/serve.sh"
+
+ISNAAD_VERSION="1.0.0 — Samsung 16 Edition"
+
+# ------------------------------------------------------------- global options
+#
+# Parsed before the subcommand so `isnaad --port 8080 up` and `isnaad up --port
+# 8080` both work. Anything unrecognised is left for the subcommand.
+
+ISNAAD_ARGS=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --port)     ISNAAD_PORT="$2"; shift 2 ;;
+    --port=*)   ISNAAD_PORT="${1#*=}"; shift ;;
+    --browser)  ISNAAD_BROWSER="$2"; shift 2 ;;
+    --browser=*) ISNAAD_BROWSER="${1#*=}"; shift ;;
+    --lan)      ISNAAD_LAN=1; shift ;;
+    --root-rpc) ISNAAD_ALLOW_ROOT_RPC=1; shift ;;
+    --root-exec) ISNAAD_ALLOW_ROOT_RPC=1; ISNAAD_ALLOW_ROOT_EXEC=1; shift ;;
+    --rebuild)  ISNAAD_FORCE_BUILD=1; shift ;;
+    --yes|-y)   ISNAAD_ASSUME_YES=1; shift ;;
+    --no-color) NO_COLOR=1; shift ;;
+    -h|--help)  ISNAAD_ARGS+=("help"); shift ;;
+    -V|--version) say "isnaad $ISNAAD_VERSION"; exit 0 ;;
+    --) shift; while [ "$#" -gt 0 ]; do ISNAAD_ARGS+=("$1"); shift; done ;;
+    *)  ISNAAD_ARGS+=("$1"); shift ;;
+  esac
+done
+export ISNAAD_PORT ISNAAD_BROWSER ISNAAD_LAN ISNAAD_ALLOW_ROOT_RPC ISNAAD_ALLOW_ROOT_EXEC \
+       ISNAAD_FORCE_BUILD ISNAAD_ASSUME_YES
+set -- "${ISNAAD_ARGS[@]+"${ISNAAD_ARGS[@]}"}"
+
+usage() {
+  cat <<'USAGE'
+محرك الإسناد المعرفي الانغماسي — Termux CLI · Samsung 16 Edition
+
+  isnaad <command> [options]
+
+الجلسة · session
+  up                     build if needed, serve, open the browser, hold the wake lock
+  down                   stop the bridge and release the wake lock
+  status                 bridge, device and takeover state
+  open                   re-open the browser at the running bridge
+  logs [-f]              the bridge log
+  doctor                 diagnose this phone against what the engine needs
+  setup                  install packages and dependencies
+
+القيادة · driving the page   (the browser is open; you are typing here)
+  play [surah] [ayah]    play — optionally selecting the ayah first
+  pause | toggle
+  next | prev            الآية التالية / السابقة
+  ayah <surah> <ayah>    select without playing
+  reciter <id>           husary | kurdi | qatami | dosari
+  scene <id>             one of the twenty phenomena; `scenes` lists them
+  route <path>           / · /engine/spatial · /engine/isnaad · /experiences/<slug>
+  hud on|off|toggle      HUD visibility
+  invert on|off|toggle   الرتق — inverted viewport
+  volume <0..1>
+  loop on|off
+  lambda <lower|upper> <0.1..6.0>    مرج البحرين — set a sea's eigenvalue
+  reload | calibrate reset|complete
+  send <command> [args]  any command, unabridged
+  watch [--hz=N]         live six-vector, redrawn in place
+  state [--json]         one snapshot of what the page reports
+  scenes | commands      what can be named
+
+الجهاز · the device        (the page calls these too, through window.__TERMUX__)
+  dev <op> [k=v ...]     run one device op — `dev list` shows them all
+  toast <text> | notify <text> | vibrate [ms] | speak <text>
+  battery | torch on|off | brightness <0..255|auto>
+
+الجذر · root               (uses existing root; never obtains it)
+  root status            su provider, live grant, what the takeover changed
+  root takeover [hz]     apply the elevated profile — recorded and reversible
+  root restore           put every recorded value back
+  root thermal           why the last session throttled
+  su [command]           a root shell in the project, or one command in it
+
+المحرّك السفلي · SANDBOX-LOWER   (tri-reality-os)
+  tro selftest           hyper-math self-tests, on this phone's actual CPU
+  tro daemon <endpoint>  stream proper-time telemetry up to SANDBOX-UPPER
+
+الخيارات · options
+  --port N               bridge port (default 4173; <1024 needs root)
+  --browser <name>       samsung | chrome | firefox | edge | default | <package>
+  --lan                  bind 0.0.0.0 as well as loopback (token required)
+  --root-rpc             let the page call privileged ops
+  --root-exec            …including the unbounded one. Implies --root-rpc.
+  --rebuild              rebuild even if dist/ is current
+  --yes                  answer every confirmation with yes
+USAGE
+}
+
+# ----------------------------------------------------------------- subcommands
+
+cmd_send() {
+  require_bridge
+  ctl command "$@"
+}
+
+cmd_play() {
+  require_bridge
+  # `isnaad play 18 60` is two operations — select, then play — because the
+  # store's play() acts on whatever verse is current.
+  if [ "$#" -ge 2 ]; then
+    ctl command verse "$1" "$2" || return 1
+  fi
+  ctl command play
+}
+
+cmd_dev() {
+  require_bridge
+  local op="${1:-}"
+  case "$op" in
+    ''|list) ctl ops ;;
+    *) shift; ctl rpc "$op" "$@" ;;
+  esac
+}
+
+cmd_status() {
+  step "الحالة — status"
+  if bridge_running; then
+    ok "bridge running — pid $(cat "$ISNAAD_PID"), port $ISNAAD_PORT"
+    bridge_show_url
+    ctl state 2>/dev/null || dim "  the page has not connected yet"
+  else
+    dim "  no bridge running"
+  fi
+  say ""
+  root_status || true
+}
+
+cmd_setup() {
+  step "التنصيب — setup"
+  if is_termux; then
+    local packages="nodejs-lts git termux-api python openssl"
+    info "pkg install $packages"
+    if confirm "install these Termux packages?"; then
+      # shellcheck disable=SC2086
+      pkg install -y $packages || warn "pkg install reported an error; check the output above"
+    fi
+    if confirm "install python-numpy (needed by SANDBOX-LOWER)?"; then
+      pkg install -y python-numpy || warn "python-numpy is not in this repository mirror"
+    fi
+    if have termux-setup-storage && confirm "grant Termux storage access (for saving captures)?"; then
+      termux-setup-storage
+    fi
+  else
+    warn "not Termux — skipping pkg; install node 20+, git and python yourself"
+  fi
+  ensure_deps
+  say ""
+  doctor_run
+}
+
+cmd_logs() {
+  [ -f "$ISNAAD_LOG" ] || die "no log at $ISNAAD_LOG"
+  case "${1:-}" in
+    -f|--follow) tail -f "$ISNAAD_LOG" ;;
+    *) tail -n "${1:-80}" "$ISNAAD_LOG" ;;
+  esac
+}
+
+cmd_scenes() {
+  # Read the catalogue out of the source rather than duplicating twenty ids in
+  # a shell array that would silently rot the first time a scene is renamed.
+  #
+  # Only quoted values are matched, which is what excludes the `id: PhenomenonId;`
+  # line in the interface declaration above the table. `id` always precedes
+  # `title` within an entry, so pairing the stream two lines at a time is exact.
+  # grep/sed/paste only: Termux's base install has no awk.
+  local source="$ISNAAD_REPO/src/data/phenomena.ts"
+  [ -f "$source" ] || die "cannot find $source"
+  step "الظواهر العشرون — the twenty phenomena"
+  grep -E "^[[:space:]]+(id|title): '" "$source" \
+    | sed -E "s/^[[:space:]]*(id|title): '([^']*)'.*/\2/" \
+    | paste -d '\t' - - \
+    | while IFS=$'\t' read -r id title; do
+        printf '  %-22s %s\n' "$id" "$title"
+      done
+}
+
+cmd_tro() {
+  local lower="$ISNAAD_REPO/tri-reality-os/sandbox-lower"
+  [ -d "$lower" ] || die "tri-reality-os/sandbox-lower is not in this checkout"
+  case "${1:-}" in
+    selftest)
+      have python || die "python is not installed. pkg install python python-numpy"
+      step "SANDBOX-LOWER — self-test on $(device_model) [$(cpu_arch)]"
+      ( cd "$lower" && python hilbert_field.py && python dilation_registry.py )
+      ;;
+    daemon)
+      shift
+      [ "$#" -ge 1 ] || die "usage: isnaad tro daemon <endpoint-url> [--registry=DIR] [--interval=MS]"
+      local endpoint="$1"; shift
+      ( cd "$lower" && node upper_sync_daemon.js "--endpoint=$endpoint" "$@" )
+      ;;
+    test)
+      ( cd "$lower" && node --test tests/ )
+      ;;
+    *)
+      say "usage: isnaad tro {selftest|test|daemon <endpoint>}"
+      return 2
+      ;;
+  esac
+}
+
+# ------------------------------------------------------------------- dispatch
+
+command_name="${1:-help}"
+[ "$#" -gt 0 ] && shift
+
+case "$command_name" in
+  up)        up "$@" ;;
+  down|stop) bridge_stop ;;
+  restart)   bridge_stop; up "$@" ;;
+  status)    cmd_status ;;
+  open)      require_bridge; foreground_termux; open_url "$(bridge_url_with_token)" ;;
+  logs)      cmd_logs "$@" ;;
+  doctor)    doctor_run ;;
+  setup)     cmd_setup ;;
+
+  play)      cmd_play "$@" ;;
+  pause|toggle|next|prev|reload) require_bridge; ctl command "$command_name" ;;
+  ayah|verse) require_bridge; ctl command verse "$@" ;;
+  reciter|scene|route|hud|invert|volume|loop|lambda|calibrate)
+             require_bridge; ctl command "$command_name" "$@" ;;
+  send)      cmd_send "$@" ;;
+  watch)     require_bridge; ctl watch "$@" ;;
+  state)     require_bridge; ctl state "$@" ;;
+  commands)  require_bridge; ctl commands ;;
+  scenes)    cmd_scenes ;;
+
+  dev)       cmd_dev "$@" ;;
+  toast)     require_bridge; ctl rpc device.toast "message=$*" ;;
+  notify)    require_bridge; ctl rpc device.notify "content=$*" ;;
+  vibrate)   require_bridge; ctl rpc device.vibrate "ms=${1:-60}" ;;
+  speak)     require_bridge; ctl rpc device.speak "message=$*" ;;
+  battery)   require_bridge; ctl rpc device.battery ;;
+  torch)     require_bridge; ctl rpc device.torch "state=${1:-on}" ;;
+  brightness) require_bridge; ctl rpc device.brightness "level=${1:-auto}" ;;
+
+  root)
+    case "${1:-status}" in
+      status)   root_status ;;
+      takeover) shift; root_takeover "$@" ;;
+      restore)  root_restore ;;
+      thermal)  root_thermal ;;
+      exec)     shift; root_shell "$@" ;;
+      *)        say "usage: isnaad root {status|takeover [hz]|restore|thermal|exec <cmd>}"; exit 2 ;;
+    esac
+    ;;
+  su)        root_shell "$@" ;;
+
+  tro)       cmd_tro "$@" ;;
+
+  version)   say "isnaad $ISNAAD_VERSION" ;;
+  help|'')   usage ;;
+  *)
+    err "unknown command '$command_name'"
+    say ""
+    usage
+    exit 2
+    ;;
+esac
