@@ -1,0 +1,8 @@
+{
+  "name": "tri-reality-os-sandbox-upper",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SANDBOX-UPPER: Vercel serverless ingest for TRO1 proper-time telemetry.",
+  "engines": { "node": ">=20.0.0" }
+}

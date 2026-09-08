@@ -1,0 +1,7 @@
+# SANDBOX-LOWER numerical stack.
+# On Termux/ARM64 install the prebuilt wheels rather than compiling:
+#   pkg install python numpy python-scipy
+# scipy is required only for Path B (Bessel) and Path C (Sobol'); the exact
+# closed form of Path A and the entire dilation registry need numpy alone.
+numpy>=1.24
+scipy>=1.10
