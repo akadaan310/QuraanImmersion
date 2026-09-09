@@ -165,23 +165,26 @@
         if (known.length && known.indexOf(args[0]) === -1) {
           throw new Error("unknown scene '" + args[0] + "'. known: " + known.join(' '));
         }
-        state.setPhenomenon(args[0]);
+        // A pin, not a mode: the store releases it at the next verse.
+        state.pinPhenomenon(args[0]);
         break;
       }
-      case 'route': {
-        history.pushState({}, '', args[0]);
-        // React Router listens on popstate; pushState alone does not emit it.
-        dispatchEvent(new PopStateEvent('popstate', { state: {} }));
-        break;
-      }
-      case 'hud': store.setState({ hudVisible: onOff(state.hudVisible, args[0]) }); break;
-      case 'invert': store.setState({ inverted: onOff(state.inverted, args[0]) }); break;
+      case 'orient': state.adopt(args[0] === 'none' ? null : args[0]); break;
+      case 'swipe': state.focus(args[0] === 'next' ? 1 : -1); break;
+      case 'tap': state.commitFocus(); break;
+      case 'veil': store.setState({ veil: onOff(state.veil, args[0]) }); break;
       case 'volume': state.setVolume(args[0]); break;
       case 'loop': state.setLoopVerse(args[0] === 'on'); break;
       case 'lambda': state.setLambda(args[0], args[1]); break;
       case 'reload': location.reload(); break;
-      case 'calibrate':
-        if (args[0] === 'reset') state.resetCalibration(); else state.completeCalibration();
+      case 'gate':
+        // 'open' performs the unlock the first tap performs, which also starts
+        // the journey. 'reset' clears it so the gate can be seen again.
+        if (args[0] === 'open') state.unlock();
+        else {
+          try { localStorage.removeItem('isnaad.unlocked.v2'); } catch (e) { /* private mode */ }
+          store.setState({ unlocked: false });
+        }
         break;
       case 'ping': break;
       default: throw new Error('unhandled command ' + command.name);
@@ -203,20 +206,36 @@
 
     var state = api.session.getState();
     report.session = {
-      calibrated: state.calibrated,
+      unlocked: state.unlocked,
       reciter: state.reciter,
       surah: state.surah,
       ayah: state.ayah,
-      phenomenon: state.phenomenon,
+      // The phenomenon is derived from the waypoint unless something has pinned
+      // one, so both are reported: the terminal should be able to tell a leg
+      // that arrived at a scene from a scene the operator pinned there.
+      phenomenon: state.pinnedPhenomenon || (state.waypoint && state.waypoint.phenomenon),
+      pinned: Boolean(state.pinnedPhenomenon),
       playing: state.playing,
       provider: state.provider,
       routeFailed: state.routeFailed,
       volume: state.volume,
-      hud: state.hudVisible,
-      inverted: state.inverted,
+      veil: state.veil,
+      orientation: state.orientation,
+      focused: state.focused,
       lambdaLower: state.lambdaLower,
       lambdaUpper: state.lambdaUpper,
     };
+
+    // Where on السيارة this leg lands, and how far up the ladder it is. This is
+    // what `isnaad watch` renders as the position readout in the terminal.
+    if (state.waypoint) {
+      report.waypoint = {
+        index: state.waypoint.index,
+        lat: Math.round(state.waypoint.at.lat * 1000) / 1000,
+        lon: Math.round(state.waypoint.at.lon * 1000) / 1000,
+        anchored: state.waypoint.anchored,
+      };
+    }
 
     var isnaad = api.isnaadEngine && api.isnaadEngine.snapshot;
     if (isnaad) {

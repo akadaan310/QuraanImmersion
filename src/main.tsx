@@ -1,6 +1,5 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
 
 import App from './App';
 import { bindEngineToSession, useSession } from '@/state/store';
@@ -14,15 +13,19 @@ import './index.css';
 bindEngineToSession();
 
 /**
- * Debug bridge. The engines are module singletons with no React surface, so
- * without this there is no way to inspect or drive them from the console or from
- * an automated render harness. Nothing in the app reads it back.
+ * Debug bridge.
  *
- * `session` is the Zustand store itself rather than a snapshot, because the two
- * external drivers — the browser console and the Termux CLI (`termux/`) — both
- * need to *act* on human-speed state, not merely read it: `getState().play()`,
- * `getState().selectVerse(18, 60)`. The catalogues ride along so a driver can
- * validate an id before handing it to a store that would index a table with it.
+ * The engines are module singletons with no React surface, and the interface
+ * itself now offers nothing but the isnaad orientations — no transport, no
+ * picker, no route. So this is the only way to inspect or drive the journey:
+ * from the browser console, from the verification harness, or from the Termux
+ * CLI over the bridge in `termux/`.
+ *
+ * `session` is the store itself rather than a snapshot, because every external
+ * driver needs to ACT on human-speed state — `getState().selectVerse(18, 60)`,
+ * `getState().adopt('l5')` — and not merely read it. The catalogues ride along
+ * so a driver can validate an id before handing it to a store that would
+ * otherwise index a table with it.
  */
 declare global {
   interface Window {
@@ -42,8 +45,6 @@ if (!container) throw new Error('root container missing');
 
 createRoot(container).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <App />
   </StrictMode>,
 );

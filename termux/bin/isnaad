@@ -112,14 +112,17 @@ usage() {
   next | prev            الآية التالية / السابقة
   ayah <surah> <ayah>    select without playing
   reciter <id>           husary | kurdi | qatami | dosari
-  scene <id>             one of the twenty phenomena; `scenes` lists them
-  route <path>           / · /engine/spatial · /engine/isnaad · /experiences/<slug>
-  hud on|off|toggle      HUD visibility
-  invert on|off|toggle   الرتق — inverted viewport
+  scene <id>             pin a phenomenon at this station; `scenes` lists all twenty
+
+  orient <l1..l6|none>   adopt an isnaad orientation — what a tap does
+  swipe next|prev        move the focus between this ayah's orientations
+  tap                    adopt the focused orientation
+  veil on|off|toggle     the ayah text over the field
+
   volume <0..1>
   loop on|off
   lambda <lower|upper> <0.1..6.0>    مرج البحرين — set a sea's eigenvalue
-  reload | calibrate reset|complete
+  reload | gate open|reset
   send <command> [args]  any command, unabridged
   watch [--hz=N]         live six-vector, redrawn in place
   state [--json]         one snapshot of what the page reports
@@ -284,7 +287,7 @@ case "$command_name" in
   play)      cmd_play "$@" ;;
   pause|toggle|next|prev|reload) require_bridge; ctl command "$command_name" ;;
   ayah|verse) require_bridge; ctl command verse "$@" ;;
-  reciter|scene|route|hud|invert|volume|loop|lambda|calibrate)
+  reciter|scene|orient|swipe|tap|veil|volume|loop|lambda|gate)
              require_bridge; ctl command "$command_name" "$@" ;;
   send)      cmd_send "$@" ;;
   watch)     require_bridge; ctl watch "$@" ;;

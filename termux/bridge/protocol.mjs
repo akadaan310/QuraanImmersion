@@ -47,18 +47,27 @@ export const COMMANDS = {
   reciter:   { args: [{ name: 'id', type: 'enum', values: ['husary', 'kurdi', 'qatami', 'dosari'] }],
                help: 'switch reciter' },
   scene:     { args: [{ name: 'id', type: 'string', pattern: /^[a-z0-9-]{2,40}$/ }],
-               help: 'select phenomenon by id' },
-  route:     { args: [{ name: 'path', type: 'string', pattern: /^\/[A-Za-z0-9/_:-]{0,80}$/ }],
-               help: 'navigate the SPA' },
-  hud:       { args: [{ name: 'state', type: 'enum', values: ['on', 'off', 'toggle'] }], help: 'HUD visibility' },
-  invert:    { args: [{ name: 'state', type: 'enum', values: ['on', 'off', 'toggle'] }], help: 'inverted viewport' },
+               help: 'pin a phenomenon at the current station' },
+
+  // The journey has no routes and no HUD to toggle. What it has is the
+  // orientation field, and these are the terminal's way of reaching it —
+  // the same two acts a finger performs, named.
+  orient:    { args: [{ name: 'id', type: 'enum', values: ['l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'none'] }],
+               help: 'adopt an isnaad orientation (none releases it)' },
+  swipe:     { args: [{ name: 'direction', type: 'enum', values: ['next', 'prev'] }],
+               help: 'move the focus between the orientations this ayah offers' },
+  tap:       { args: [], help: 'adopt the focused orientation, as a tap would' },
+  veil:      { args: [{ name: 'state', type: 'enum', values: ['on', 'off', 'toggle'] }],
+               help: 'the ayah text over the field' },
+
   volume:    { args: [{ name: 'level', type: 'float', min: 0, max: 1 }], help: 'output level 0..1' },
   loop:      { args: [{ name: 'state', type: 'enum', values: ['on', 'off'] }], help: 'loop the ayah' },
   lambda:    { args: [{ name: 'sea', type: 'enum', values: ['lower', 'upper'] },
                       { name: 'value', type: 'float', min: 0.1, max: 6.0 }],
                help: 'set a sea eigenvalue (مرج البحرين)' },
   reload:    { args: [], help: 'reload the page' },
-  calibrate: { args: [{ name: 'state', type: 'enum', values: ['reset', 'complete'] }], help: 'onboarding gate' },
+  gate:      { args: [{ name: 'state', type: 'enum', values: ['open', 'reset'] }],
+               help: 'the audio-unlock gesture gate' },
   ping:      { args: [], help: 'liveness probe; the page answers with state' },
 };
 

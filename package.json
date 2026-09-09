@@ -13,18 +13,18 @@
     "verify": "npm run verify:no-translation && tsc -b && vitest run",
     "verify:scenes": "node scripts/verify-scenes.mjs",
     "verify:audio": "node scripts/verify-audio.mjs",
-    "verify:all": "npm run verify && npm run build && npm run verify:scenes && npm run verify:audio",
+    "verify:all": "npm run verify && npm run build && npm run verify:scenes && npm run verify:orientations && npm run verify:audio",
     "test": "vitest run",
     "termux:test": "node --test termux/tests/bridge.test.mjs",
     "termux:up": "termux/bin/isnaad up",
-    "termux:doctor": "termux/bin/isnaad doctor"
+    "termux:doctor": "termux/bin/isnaad doctor",
+    "verify:orientations": "node scripts/verify-orientations.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.3",
     "@react-three/fiber": "^8.17.10",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.27.0",
     "three": "^0.169.0",
     "zustand": "^4.5.5"
   },

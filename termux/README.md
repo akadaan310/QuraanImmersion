@@ -70,17 +70,29 @@ The browser is open on the phone. You are typing in Termux. These reach it:
 
 ```bash
 isnaad play 18 60          # سورة الكهف، الآية ٦٠ — select, then play
-isnaad next                # الآية التالية
+isnaad next                # الآية التالية — the next leg of السير
 isnaad reciter dosari
-isnaad scene noor-ala-noor # `isnaad scenes` lists all twenty
-isnaad route /engine/isnaad
+isnaad scene noor-ala-noor # pin a phenomenon here; `isnaad scenes` lists all twenty
 isnaad lambda lower 3.0    # مرج البحرين — drive one sea into collapse
 isnaad watch               # the live six-vector, redrawn in place
 ```
 
+The front end has no menu and no routes — a swipe moves the focus between the
+isnaad orientations the current ayah offers, and a tap adopts one. The CLI
+reaches that same surface, and nothing else:
+
+```bash
+isnaad orient l5           # adopt المستمع غير المرئي directly
+isnaad swipe next          # move the focus, as a swipe would
+isnaad tap                 # adopt the focused orientation
+isnaad veil off            # hide the ayah text over the field
+```
+
 `isnaad watch` renders L1…L6, the closure impulse and the analyser's level and
 spectral centroid as bars in the terminal, at 2 Hz, while the phone lies face
-down. `isnaad state --json` is the same data for a script.
+down. `isnaad state --json` is the same data for a script, and carries the
+waypoint the journey is flying to — coordinate, index, and whether the
+phenomenon standing there is one the ayah actually anchors.
 
 Commands issued while no browser is attached are queued and replayed when one
 connects, so `isnaad up && isnaad play 18 60` works without a race.

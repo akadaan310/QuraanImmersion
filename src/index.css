@@ -2,14 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * The interface is four elements: the readout, the ayah, the trail of offered
+ * orientations, and the markers standing in the world. Everything else on screen
+ * is the universe.
+ *
+ * The layering rule that matters: the gesture surface must sit BELOW the
+ * orientation markers. The markers are DOM nodes portalled over the canvas by
+ * drei's Html at z-index 20–40; the gesture surface takes 10, so a tap on a
+ * marker reaches the marker and a tap on empty space reaches the surface. Invert
+ * that and the only controls in the application become untappable.
+ */
+
 @layer base {
   :root {
     color-scheme: dark;
-    --vacuum: #030712;
-    --abyss: #0b0f19;
-    --hull: #111827;
+    --vacuum: #01030a;
+    --abyss: #050a16;
     --cyan: #22d3ee;
     --amber: #fbbf24;
+    --ink: rgba(203, 213, 225, 0.92);
+    --whisper: rgba(148, 163, 184, 0.55);
+
+    /* The safe-area insets: a Galaxy's punch-hole camera and gesture bar both
+       overlap a full-bleed canvas, and the readout must clear them. */
+    --edge-top: max(env(safe-area-inset-top), 14px);
+    --edge-bottom: max(env(safe-area-inset-bottom), 16px);
+    --edge-side: max(env(safe-area-inset-right), 16px);
   }
 
   html,
@@ -18,69 +37,247 @@
     height: 100%;
     margin: 0;
     background: var(--vacuum);
-    color: #cbd5e1;
+    color: var(--ink);
+    /* The journey is one continuous flight; nothing scrolls, and a pull-to-
+       refresh in the middle of a recitation would end the session. */
+    overflow: hidden;
     overscroll-behavior: none;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
-    font-family: '"Noto Kufi Arabic"', system-ui, sans-serif;
+    font-family: 'Noto Kufi Arabic', 'Noto Naskh Arabic', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
-  ::selection {
-    background: rgba(34, 211, 238, 0.28);
-  }
-
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: #0b0f19;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #1f2937;
-    border-radius: 9999px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #22d3ee55;
+  canvas {
+    display: block;
+    touch-action: none;
   }
 }
 
 @layer components {
-  .hud-panel {
-    @apply rounded-lg border border-cyan-400/15 bg-[#0b0f19]/80 backdrop-blur-md;
-    box-shadow: inset 0 0 40px -28px rgba(34, 211, 238, 0.9);
-  }
+  /* ------------------------------------------------------------- the surface */
 
-  .hud-label {
-    @apply font-kufi text-[10px] uppercase tracking-[0.2em] text-cyan-300/60;
-  }
-
-  .ayah-glyph {
-    font-family: 'Amiri Quran', 'KFGQPC Uthmanic Script HAFS', 'Scheherazade New', serif;
-    line-height: 2.1;
-    letter-spacing: 0;
-  }
-
-  .vector-rail {
-    @apply relative h-[3px] w-full overflow-hidden rounded-full bg-cyan-400/10;
-  }
-
-  .vector-rail > i {
-    @apply absolute inset-y-0 right-0 block rounded-full;
-    background: linear-gradient(270deg, #22d3ee, #fbbf24);
-    transition: width 90ms linear;
-  }
-
-  .grain::after {
-    content: '';
-    position: absolute;
+  .isnaad-gesture {
+    position: fixed;
     inset: 0;
-    pointer-events: none;
-    opacity: 0.035;
-    background-image: radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0);
-    background-size: 3px 3px;
+    z-index: 10;
+    /* Transparent, but a real hit target: without a background the browser
+       still delivers pointer events to a positioned element, and leaving it
+       transparent is what keeps the universe unobstructed. */
+    background: transparent;
+    touch-action: none;
   }
+
+  /* -------------------------------------------------------------- the ayah */
+
+  .isnaad-veil {
+    position: fixed;
+    z-index: 15;
+    inset-inline: 0;
+    bottom: calc(var(--edge-bottom) + 58px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding-inline: 24px;
+    pointer-events: none;
+    text-align: center;
+  }
+
+  .isnaad-veil__ayah {
+    margin: 0;
+    max-width: 34rem;
+    font-family: 'Amiri Quran', 'Noto Naskh Arabic', serif;
+    font-size: clamp(1.25rem, 5.4vw, 2.1rem);
+    line-height: 2.15;
+    color: #f8fafc;
+    /* The text sits over a live shader field with no panel behind it. The glow
+       is what keeps it legible against both the lit limb and the night side —
+       a solid backdrop would put a rectangle in the middle of the universe. */
+    text-shadow:
+      0 0 24px rgba(1, 3, 10, 0.95),
+      0 0 8px rgba(1, 3, 10, 0.9),
+      0 1px 2px rgba(1, 3, 10, 1);
+  }
+
+  .isnaad-veil__key {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    color: var(--whisper);
+    text-shadow: 0 0 16px rgba(1, 3, 10, 0.95);
+  }
+
+  .isnaad-veil__gate {
+    margin: 0 0 6px;
+    font-size: 0.86rem;
+    letter-spacing: 0.24em;
+    color: var(--cyan);
+    animation: isnaad-breathe 3.2s ease-in-out infinite;
+  }
+
+  .isnaad-veil__fault {
+    margin: 0;
+    font-size: 0.72rem;
+    color: #fca5a5;
+  }
+
+  /* ------------------------------------------------------------ the readout */
+
+  .isnaad-readout {
+    position: fixed;
+    z-index: 15;
+    top: var(--edge-top);
+    inset-inline-end: var(--edge-side);
+    display: grid;
+    grid-template-columns: auto;
+    gap: 3px;
+    pointer-events: none;
+    font-size: 0.66rem;
+    line-height: 1.7;
+    letter-spacing: 0.04em;
+    color: var(--whisper);
+    text-align: end;
+    text-shadow: 0 0 14px rgba(1, 3, 10, 0.95);
+  }
+
+  .isnaad-readout__row {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    align-items: baseline;
+    white-space: nowrap;
+  }
+
+  .isnaad-readout__row--wide {
+    max-width: 60vw;
+    white-space: normal;
+  }
+
+  .isnaad-readout__label {
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    color: rgba(34, 211, 238, 0.5);
+  }
+
+  /* -------------------------------------------------------------- the trail */
+
+  .isnaad-trail {
+    position: fixed;
+    z-index: 15;
+    inset-inline: 0;
+    bottom: var(--edge-bottom);
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    pointer-events: none;
+  }
+
+  .isnaad-trail__dot {
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid rgba(34, 211, 238, 0.14);
+    color: rgba(148, 163, 184, 0.5);
+    background: rgba(1, 3, 10, 0.5);
+    transition: color 220ms ease, border-color 220ms ease, transform 220ms ease;
+  }
+
+  .isnaad-trail__dot.is-focused {
+    color: var(--cyan);
+    border-color: rgba(34, 211, 238, 0.55);
+    transform: translateY(-2px);
+  }
+
+  .isnaad-trail__dot.is-adopted {
+    color: #01030a;
+    background: var(--cyan);
+    border-color: var(--cyan);
+  }
+
+  /* ---------------------------------------------------- orientation markers */
+
+  .isnaad-orientation {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(34, 211, 238, 0.28);
+    background: rgba(1, 3, 10, 0.62);
+    backdrop-filter: blur(3px);
+    color: rgba(226, 232, 240, 0.82);
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    /* A phone-sized tap target, whatever the marker's rendered scale. */
+    min-width: 56px;
+    transition: border-color 200ms ease, background 200ms ease, transform 200ms ease;
+  }
+
+  .isnaad-orientation__sigil {
+    font-size: 0.92rem;
+    letter-spacing: 0.12em;
+  }
+
+  /*
+   * Only the focused or adopted marker carries its full name.
+   *
+   * With every marker labelled, four of them at the scale the camera gives them
+   * overlapped each other on a short viewport and ran off the side on a narrow
+   * one. They are also four labels competing with the ayah for attention in an
+   * interface whose whole point is the field. The sigil identifies the marker;
+   * the name appears for the one the observer is actually choosing.
+   */
+  .isnaad-orientation__name {
+    display: none;
+    font-size: 0.5rem;
+    letter-spacing: 0.06em;
+    color: rgba(148, 163, 184, 0.6);
+    max-width: 6.5rem;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .isnaad-orientation.is-focused .isnaad-orientation__name,
+  .isnaad-orientation.is-adopted .isnaad-orientation__name {
+    display: block;
+  }
+
+  .isnaad-orientation.is-focused {
+    border-color: rgba(34, 211, 238, 0.85);
+    transform: scale(1.08);
+    box-shadow: 0 0 22px -6px rgba(34, 211, 238, 0.8);
+  }
+
+  .isnaad-orientation.is-adopted {
+    background: rgba(34, 211, 238, 0.16);
+    border-color: var(--cyan);
+    color: #f0fdff;
+  }
+
+  .isnaad-orientation.is-adopted .isnaad-orientation__name {
+    color: rgba(224, 251, 255, 0.75);
+  }
+}
+
+@keyframes isnaad-breathe {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 1; }
+}
+
+/* A phone held still through a long recitation should not have its own
+   interface animating at it. Everything that moves here is the universe. */
+@media (prefers-reduced-motion: reduce) {
+  .isnaad-veil__gate { animation: none; opacity: 0.85; }
+  .isnaad-trail__dot,
+  .isnaad-orientation { transition: none; }
 }

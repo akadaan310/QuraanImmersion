@@ -43,10 +43,24 @@ test('buildCommand rejects out-of-range and malformed arguments', () => {
   assert.throws(() => buildCommand('play', ['extra']), /takes 0 argument/);
 });
 
-test('buildCommand keeps route paths inside the SPA', () => {
-  assert.equal(buildCommand('route', ['/engine/isnaad']).args[0], '/engine/isnaad');
-  assert.throws(() => buildCommand('route', ['https://example.com']), ProtocolError);
-  assert.throws(() => buildCommand('route', ['/x?<script>']), ProtocolError);
+test('the orientation commands are the terminal’s finger', () => {
+  // These three are the whole input surface of the front end, reached from the
+  // terminal: adopt one directly, move the focus, commit it.
+  assert.deepEqual(buildCommand('orient', ['l5']).args, ['l5']);
+  assert.deepEqual(buildCommand('orient', ['none']).args, ['none']);
+  assert.deepEqual(buildCommand('swipe', ['next']).args, ['next']);
+  assert.deepEqual(buildCommand('tap', []).args, []);
+
+  assert.throws(() => buildCommand('orient', ['l7']), /l1\|l2\|l3\|l4\|l5\|l6\|none/);
+  assert.throws(() => buildCommand('swipe', ['sideways']), ProtocolError);
+});
+
+test('commands the journey no longer has are gone, not silently accepted', () => {
+  // There are no routes and no HUD any more. A CLI still sending them must fail
+  // loudly in the terminal rather than posting a command the page ignores.
+  for (const retired of ['route', 'hud', 'invert', 'calibrate']) {
+    assert.throws(() => buildCommand(retired, ['/']), /unknown command/);
+  }
 });
 
 test('lambda stays inside the sweep the three-phase model is defined on', () => {

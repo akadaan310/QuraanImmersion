@@ -29,17 +29,35 @@ export async function launch({ audio = false } = {}) {
   const browser = await chromium.launch({ executablePath, args });
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 
-  // Skip the calibration protocol: these scripts verify the engine, not onboarding.
+  // Mark the session unlocked. The one gesture the app asks for exists because
+  // a browser will not open an AudioContext without it; these scripts drive the
+  // analysis path directly and never need the real graph.
   await context.addInitScript(() => {
     try {
-      localStorage.setItem('isnaad.calibration.v1', 'complete');
+      localStorage.setItem('isnaad.unlocked.v2', 'yes');
     } catch {
-      /* private mode — onboarding will simply replay, which the script tolerates */
+      /* private mode — the gate simply shows, which the scripts tolerate */
     }
   });
 
   return { browser, context };
 }
+
+/**
+ * Stand the journey at one phenomenon and adopt the closest standpoint.
+ *
+ * There are no routes any more: a scene is reached by pinning it at the current
+ * station. `l2` — إسناد الصوت والربط — puts the camera inside the station, which
+ * is what makes the screenshot a picture of the scene rather than of the Earth
+ * behind it.
+ */
+export const STAND_AT = (slug) => {
+  const bridge = window.__ISNAAD__;
+  if (!bridge) throw new Error('debug bridge missing — is this a production build of the app?');
+  bridge.session.getState().pinPhenomenon(slug);
+  bridge.session.getState().adopt('l2');
+  bridge.session.setState({ veil: false });
+};
 
 /** Push a synthetic recitation frame through the real analysis path. */
 export const DRIVE_SYNTHETIC_AUDIO = () => {
