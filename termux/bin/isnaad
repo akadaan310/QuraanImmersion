@@ -22,8 +22,33 @@
 
 set -uo pipefail
 
-ISNAAD_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Find the checkout this script belongs to.
+#
+# The installer links this file onto PATH ($PREFIX/bin/isnaad), so BASH_SOURCE
+# is the LINK, not the file — and every lib path derived from it would land in
+# $PREFIX/lib/ instead of the repository. Walk the symlink chain first.
+# `readlink -f` would do it in one call, but Termux's coreutils is not
+# guaranteed to be installed before `isnaad setup` has run, and this has to work
+# on the very first invocation.
+ISNAAD_SELF_FILE="${BASH_SOURCE[0]}"
+while [ -L "$ISNAAD_SELF_FILE" ]; do
+  isnaad_link_target="$(readlink "$ISNAAD_SELF_FILE")" || break
+  case "$isnaad_link_target" in
+    /*) ISNAAD_SELF_FILE="$isnaad_link_target" ;;
+    *)  ISNAAD_SELF_FILE="$(dirname "$ISNAAD_SELF_FILE")/$isnaad_link_target" ;;
+  esac
+done
+
+ISNAAD_BIN="$(cd "$(dirname "$ISNAAD_SELF_FILE")" && pwd)"
 ISNAAD_SELF="$(dirname "$ISNAAD_BIN")"
+
+if [ ! -r "$ISNAAD_SELF/lib/common.sh" ]; then
+  printf '✗ isnaad: cannot find the libraries.\n' >&2
+  printf '  this script resolved to: %s\n' "$ISNAAD_SELF_FILE" >&2
+  printf '  expected:                %s/lib/common.sh\n' "$ISNAAD_SELF/lib/common.sh" >&2
+  printf '\n  Run it from the checkout instead:  bash <repo>/termux/bin/isnaad %s\n' "${1:-up}" >&2
+  exit 1
+fi
 
 # shellcheck source=../lib/common.sh
 . "$ISNAAD_SELF/lib/common.sh"
