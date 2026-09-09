@@ -87,7 +87,9 @@ export const useSession = create<SessionState>((set, get) => ({
   autoAdvance: true,
   volume: 0.9,
 
-  hudVisible: true,
+  // The rails are lg-only; opening them on a phone would just hide the canvas
+  // behind panels the layout cannot fit.
+  hudVisible: typeof window !== 'undefined' ? window.innerWidth >= 1024 : true,
   inverted: true,
 
   textError: null,

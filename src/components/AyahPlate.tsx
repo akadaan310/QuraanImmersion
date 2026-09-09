@@ -43,9 +43,9 @@ export function AyahPlate({ surah, ayah, accent }: { surah: number; ayah: number
     // translate="no" + notranslate repeat the document-level lockdown at the one
     // element that must never be rewritten. Chrome was observed translating the
     // Basmala here in production; belt and braces is warranted for this node.
-    <section className="hud-panel px-6 py-5 notranslate" translate="no" aria-label="نص الآية">
+    <section className="hud-panel px-3 py-3 sm:px-6 sm:py-5 notranslate" translate="no" aria-label="نص الآية">
       <header className="flex items-baseline justify-between gap-4">
-        <h2 className="font-uthmani text-xl text-slate-100">
+        <h2 className="font-uthmani text-base text-slate-100 sm:text-xl">
           سورة {definition.name}
           <span className="mr-3 font-kufi text-[11px] text-slate-500">{definition.place}</span>
         </h2>
@@ -58,10 +58,10 @@ export function AyahPlate({ surah, ayah, accent }: { surah: number; ayah: number
       </header>
 
       {showBasmala && (
-        <p className="ayah-glyph mt-4 text-center text-lg text-slate-400/80">{BASMALA}</p>
+        <p className="ayah-glyph mt-2 text-center text-sm text-slate-400/80 sm:mt-4 sm:text-lg">{BASMALA}</p>
       )}
 
-      <p className="ayah-glyph mt-4 text-center text-2xl leading-[2.4] text-slate-100 sm:text-3xl">
+      <p className="ayah-glyph mt-2 max-h-[26vh] overflow-y-auto text-center text-lg leading-[2.1] text-slate-100 sm:mt-4 sm:max-h-none sm:text-3xl sm:leading-[2.4]">
         {verse ? (
           <>
             {verse.text}

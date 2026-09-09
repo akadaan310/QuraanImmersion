@@ -56,19 +56,19 @@ export function TransportBar({ accent }: { accent: string }) {
   }, [toggleTransport, advance, retreat]);
 
   return (
-    <section className="hud-panel px-4 py-3" aria-label="شريط التشغيل">
-      <SpectrumRibbon accent={accent} />
+    <section className="hud-panel px-2 py-2 sm:px-4 sm:py-3" aria-label="شريط التشغيل">
+      <SpectrumRibbon accent={accent} height={28} />
 
       <div className="vector-rail my-3">
         <i ref={progress} style={{ width: '0%' }} />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-between sm:gap-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={retreat}
-            className="rounded-md border border-slate-800 px-3 py-1.5 font-kufi text-[11px] text-slate-300 hover:border-slate-600"
+            className="rounded-md border border-slate-800 px-2.5 py-1.5 font-kufi text-[10px] text-slate-300 hover:border-slate-600 sm:px-3 sm:text-[11px]"
           >
             الآية السابقة
           </button>
@@ -76,7 +76,7 @@ export function TransportBar({ accent }: { accent: string }) {
           <button
             type="button"
             onClick={toggleTransport}
-            className="rounded-md border px-5 py-1.5 font-kufi text-[11px]"
+            className="rounded-md border px-4 py-1.5 font-kufi text-[10px] sm:px-5 sm:text-[11px]"
             style={{ borderColor: accent, color: accent, boxShadow: `0 0 20px -10px ${accent}` }}
           >
             {playing ? 'إيقاف مؤقت' : 'تشغيل الآية'}
@@ -85,13 +85,13 @@ export function TransportBar({ accent }: { accent: string }) {
           <button
             type="button"
             onClick={advance}
-            className="rounded-md border border-slate-800 px-3 py-1.5 font-kufi text-[11px] text-slate-300 hover:border-slate-600"
+            className="rounded-md border border-slate-800 px-2.5 py-1.5 font-kufi text-[10px] text-slate-300 hover:border-slate-600 sm:px-3 sm:text-[11px]"
           >
             الآية التالية
           </button>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="hidden items-center gap-4 sm:flex">
           <label className="flex items-center gap-2 font-kufi text-[11px] text-slate-400">
             <input
               type="checkbox"
