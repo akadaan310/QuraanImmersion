@@ -114,10 +114,11 @@ usage() {
   reciter <id>           husary | kurdi | qatami | dosari
   scene <id>             pin a phenomenon at this station; `scenes` lists all twenty
 
-  orient <l1..l6|none>   adopt an isnaad orientation — what a tap does
-  swipe next|prev        move the focus between this ayah's orientations
-  tap                    adopt the focused orientation
-  veil on|off|toggle     the ayah text over the field
+  experience <id>        enter a route — surah-18, musa-khidr, ratq-fatq …
+  goto <n>               jump to a waypoint of the current route
+  drawer <name|none>     open a bottom drawer: experiences | waypoints | reciters
+  orient <l1..l6|none>   override the standpoint the field is read from
+  veil on|off|toggle     the ayah text and the readout over the field
 
   volume <0..1>
   loop on|off
@@ -287,7 +288,7 @@ case "$command_name" in
   play)      cmd_play "$@" ;;
   pause|toggle|next|prev|reload) require_bridge; ctl command "$command_name" ;;
   ayah|verse) require_bridge; ctl command verse "$@" ;;
-  reciter|scene|orient|swipe|tap|veil|volume|loop|lambda|gate)
+  reciter|scene|experience|goto|drawer|orient|veil|volume|loop|lambda|gate)
              require_bridge; ctl command "$command_name" "$@" ;;
   send)      cmd_send "$@" ;;
   watch)     require_bridge; ctl watch "$@" ;;

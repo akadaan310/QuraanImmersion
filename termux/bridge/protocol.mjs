@@ -49,16 +49,19 @@ export const COMMANDS = {
   scene:     { args: [{ name: 'id', type: 'string', pattern: /^[a-z0-9-]{2,40}$/ }],
                help: 'pin a phenomenon at the current station' },
 
-  // The journey has no routes and no HUD to toggle. What it has is the
-  // orientation field, and these are the terminal's way of reaching it —
-  // the same two acts a finger performs, named.
-  orient:    { args: [{ name: 'id', type: 'enum', values: ['l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'none'] }],
-               help: 'adopt an isnaad orientation (none releases it)' },
-  swipe:     { args: [{ name: 'direction', type: 'enum', values: ['next', 'prev'] }],
-               help: 'move the focus between the orientations this ayah offers' },
-  tap:       { args: [], help: 'adopt the focused orientation, as a tap would' },
-  veil:      { args: [{ name: 'state', type: 'enum', values: ['on', 'off', 'toggle'] }],
-               help: 'the ayah text over the field' },
+  // The journey is a route through the muṣḥaf, so these are the terminal's way
+  // of reaching the same three things the drawer reaches: which route, which
+  // waypoint along it, and which reciter.
+  experience: { args: [{ name: 'id', type: 'string', pattern: /^[a-z0-9-]{2,48}$/ }],
+                help: 'enter an experience by id (surah-18, musa-khidr, …)' },
+  goto:       { args: [{ name: 'position', type: 'int', min: 1, max: 6236 }],
+                help: 'jump to a waypoint of the current route, 1-based' },
+  drawer:     { args: [{ name: 'which', type: 'enum', values: ['experiences', 'waypoints', 'reciters', 'none'] }],
+                help: 'open or close a bottom drawer' },
+  orient:     { args: [{ name: 'id', type: 'enum', values: ['l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'none'] }],
+                help: 'override the standpoint the field is read from' },
+  veil:       { args: [{ name: 'state', type: 'enum', values: ['on', 'off', 'toggle'] }],
+                help: 'the ayah text and the readout over the field' },
 
   volume:    { args: [{ name: 'level', type: 'float', min: 0, max: 1 }], help: 'output level 0..1' },
   loop:      { args: [{ name: 'state', type: 'enum', values: ['on', 'off'] }], help: 'loop the ayah' },

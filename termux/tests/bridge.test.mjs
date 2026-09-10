@@ -43,22 +43,25 @@ test('buildCommand rejects out-of-range and malformed arguments', () => {
   assert.throws(() => buildCommand('play', ['extra']), /takes 0 argument/);
 });
 
-test('the orientation commands are the terminal’s finger', () => {
-  // These three are the whole input surface of the front end, reached from the
-  // terminal: adopt one directly, move the focus, commit it.
+test('the route commands reach what the drawer reaches', () => {
+  assert.deepEqual(buildCommand('experience', ['musa-khidr']).args, ['musa-khidr']);
+  assert.deepEqual(buildCommand('experience', ['surah-18']).args, ['surah-18']);
+  assert.deepEqual(buildCommand('goto', ['12']).args, [12]);
+  assert.deepEqual(buildCommand('drawer', ['waypoints']).args, ['waypoints']);
   assert.deepEqual(buildCommand('orient', ['l5']).args, ['l5']);
-  assert.deepEqual(buildCommand('orient', ['none']).args, ['none']);
-  assert.deepEqual(buildCommand('swipe', ['next']).args, ['next']);
-  assert.deepEqual(buildCommand('tap', []).args, []);
 
+  // An id is a slug, never a path or a shell token.
+  assert.throws(() => buildCommand('experience', ['../etc']), ProtocolError);
+  assert.throws(() => buildCommand('experience', ['Surah 18']), ProtocolError);
+  assert.throws(() => buildCommand('goto', ['0']), /1\.\.6236/);
+  assert.throws(() => buildCommand('drawer', ['settings']), ProtocolError);
   assert.throws(() => buildCommand('orient', ['l7']), /l1\|l2\|l3\|l4\|l5\|l6\|none/);
-  assert.throws(() => buildCommand('swipe', ['sideways']), ProtocolError);
 });
 
 test('commands the journey no longer has are gone, not silently accepted', () => {
-  // There are no routes and no HUD any more. A CLI still sending them must fail
-  // loudly in the terminal rather than posting a command the page ignores.
-  for (const retired of ['route', 'hud', 'invert', 'calibrate']) {
+  // A CLI still sending a retired name must fail loudly in the terminal rather
+  // than posting a command the page silently ignores.
+  for (const retired of ['route', 'hud', 'invert', 'calibrate', 'swipe', 'tap']) {
     assert.throws(() => buildCommand(retired, ['/']), /unknown command/);
   }
 });

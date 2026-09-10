@@ -169,10 +169,11 @@
         state.pinPhenomenon(args[0]);
         break;
       }
+      case 'experience': state.enterExperience(args[0]); break;
+      case 'goto': state.goTo(args[0] - 1); break;
+      case 'drawer': state.openDrawer(args[0]); break;
       case 'orient': state.adopt(args[0] === 'none' ? null : args[0]); break;
-      case 'swipe': state.focus(args[0] === 'next' ? 1 : -1); break;
-      case 'tap': state.commitFocus(); break;
-      case 'veil': store.setState({ veil: onOff(state.veil, args[0]) }); break;
+      case 'veil': state.setVeil(onOff(state.veil, args[0])); break;
       case 'volume': state.setVolume(args[0]); break;
       case 'loop': state.setLoopVerse(args[0] === 'on'); break;
       case 'lambda': state.setLambda(args[0], args[1]); break;
@@ -215,6 +216,9 @@
       // that arrived at a scene from a scene the operator pinned there.
       phenomenon: state.pinnedPhenomenon || (state.waypoint && state.waypoint.phenomenon),
       pinned: Boolean(state.pinnedPhenomenon),
+      experience: state.experienceId,
+      position: state.position,
+      drawer: state.drawer,
       playing: state.playing,
       provider: state.provider,
       routeFailed: state.routeFailed,

@@ -39,10 +39,9 @@ import { Sky } from '@/cosmos/Sky';
 import { Shells } from '@/cosmos/Shells';
 import { useSession, activePhenomenon } from '@/state/store';
 
+import { Dust } from '@/cosmos/Dust';
 import { JourneyRig, STATION_SCALE, Track, stationPosition } from './JourneyRig';
-import { OrientationField } from './OrientationField';
-import { createNavigator, orientationsVisible, type NavState } from './AutoNavigator';
-import { orientationsFor } from './orientations';
+import { createNavigator, type NavState } from './AutoNavigator';
 import { shellOf, waypointAhead, type Waypoint } from './waypoints';
 
 /** The scenes are authored around a core of this radius. */
@@ -98,9 +97,6 @@ function Journey() {
   const waypoint = useSession((state) => state.waypoint);
   const phenomenon = useSession((state) => activePhenomenon(state));
   const orientation = useSession((state) => state.orientation);
-  const focused = useSession((state) => state.focused);
-  const playing = useSession((state) => state.playing);
-  const adopt = useSession((state) => state.adopt);
 
   const accent = PHENOMENON_BY_ID[phenomenon].accent;
 
@@ -115,25 +111,17 @@ function Journey() {
   });
   const core = useRef(stationPosition(waypoint));
 
-  // These two DO drive React, at human speed only: the markers appear once per
-  // leg and the track's progress is re-read by the shader, not by the DOM.
-  const [markersVisible, setMarkersVisible] = useState(false);
+  // The only per-frame value that reaches React, and only when it has actually
+  // moved: the shell climb, which the ladder reads as a prop. setState is
+  // idempotent for identical values only, so the guard is what keeps a
+  // frame-rate callback from queueing sixty renders a second.
   const [climb, setClimb] = useState(0);
 
   const onLeg = useCallback((state: NavState) => {
     nav.current = state;
-    const shouldShow = orientationsVisible(state);
-    // setState is idempotent in React only for identical values, so this guard
-    // is what keeps a per-frame callback from queueing sixty renders a second.
-    setMarkersVisible((current) => (current === shouldShow ? current : shouldShow));
     const rung = shellOf(waypoint.index) + state.shell;
     setClimb((current) => (Math.abs(current - rung) < 0.01 ? current : rung));
   }, [waypoint.index]);
-
-  const offered = useMemo(
-    () => orientationsFor(phenomenon, playing),
-    [phenomenon, playing],
-  );
 
   const onStation = useCallback((position: THREE.Vector3) => {
     core.current.copy(position);
@@ -158,20 +146,14 @@ function Journey() {
       <Sky />
       <Shells accent={accent} climb={climb} />
       <Earth accent={accent} />
+      {/* The medium. Without something at the vehicle's own scale streaming
+          past it, a flight through space is indistinguishable from a still. */}
+      <Dust accent={accent} />
       <Track from={previous} to={waypoint} progress={nav.current.leg} accent={accent} />
 
       <Suspense fallback={null}>
         <Station waypoint={waypoint} phenomenon={phenomenon} />
       </Suspense>
-
-      <OrientationField
-        station={core.current}
-        offered={offered}
-        adopted={orientation}
-        focused={focused}
-        visible={markersVisible}
-        onAdopt={adopt}
-      />
 
       <Preload all />
     </>

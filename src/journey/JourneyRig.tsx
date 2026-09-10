@@ -1,26 +1,32 @@
 /**
- * The rig — where the observer actually is, every frame.
+ * The rig — the vehicle, flown.
  *
- * Nothing here is driven by input. The camera's position is a function of the
- * navigator's leg, the waypoint being flown to, and the orientation the observer
- * has adopted; that is the entire authority over the view.
+ * WHY THIS IS NOT A LERP
+ * ----------------------
+ * The first version computed a desired camera position each frame and moved the
+ * camera a fraction of the way toward it. That is the standard approach and it
+ * felt exactly like what it was: a camera being dragged along a rail. There was
+ * no momentum, so nothing ever overshot, settled, or leaned; at a station it
+ * reached its target and stopped dead, and a scene with a perfectly motionless
+ * camera reads as a photograph of space rather than a position in it.
  *
- * THE LOCAL FRAME
- * ---------------
- * Every station builds an east–north–up basis from its own position on the
- * globe. An orientation is then expressed in that basis — an elevation above
- * the local horizon and a distance in station radii — rather than in world
- * coordinates. This is why the same orientation means the same thing at a
- * waypoint in the Pacific as at one over the pole: "from the earth, looking
- * along the horizon" is a local statement and has to be built locally.
+ * So the vehicle now has a STATE and the rig applies forces to it:
  *
- * WHY THE CAMERA IS NEVER SNAPPED
- * -------------------------------
- * Position, target and field of view are all approached exponentially rather
- * than assigned. Assignment is correct and looks broken: adopting an orientation
- * would cut to the new standpoint, and a cut in a continuous flight reads as a
- * dropped frame, not as a movement. The rate is frame-rate corrected, so the
- * approach takes the same wall time at 60 Hz and at 120 Hz.
+ *   · a steering acceleration toward where it should be,
+ *   · damping proportional to velocity, so it settles instead of oscillating,
+ *   · integration, so it carries momentum through a turn and drifts past a
+ *     target before easing back.
+ *
+ * Everything that follows falls out of having a real velocity: the nose points
+ * along it, the vehicle banks into the lateral component of its own
+ * acceleration the way anything that flies does, the field of view opens with
+ * speed, and the dust field has a direction to streak along.
+ *
+ * NOTHING EVER COMES TO REST
+ * --------------------------
+ * On station the destination is not a point but a slow orbit around it, so there
+ * is always parallax and the phenomenon is always being seen from a slightly new
+ * angle. Standing still is what made it feel like a harness.
  */
 
 import { useMemo, useRef } from 'react';
@@ -31,6 +37,7 @@ import { EARTH_RADIUS } from '@/cosmos/Earth';
 import { interpolate, toVector } from '@/astro/geo';
 import { ORIENTATIONS, type OrientationId } from './orientations';
 import { TRANSIT_FRACTION, type NavState } from './AutoNavigator';
+import { CRUISE_SPEED, flight } from './flight';
 import type { Waypoint } from './waypoints';
 
 const DEG = Math.PI / 180;
@@ -38,16 +45,23 @@ const DEG = Math.PI / 180;
 /**
  * Radius the phenomenon scene occupies at a station, in Earth radii.
  *
- * Chosen against the orientation markers, not by eye: the markers ring the
- * station just outside its silhouette, and if the station is large relative to
- * the camera's distance from it that ring projects outside the viewport. At
- * 0.22 the scene reads clearly against the globe AND every marker stays on
- * screen at the closest standpoint the rig will adopt. The markers are the only
- * controls the application has, so they win the trade.
+ * Large enough to be flown around rather than looked at from outside: at 0.55
+ * the scene is a structure the vehicle moves through the neighbourhood of, and
+ * the parallax across one orbit is substantial.
  */
-export const STATION_SCALE = 0.22;
+export const STATION_SCALE = 0.55;
 /** The scenes are authored around a core of this radius. */
 const SCENE_CORE = 3.2;
+
+/** Steering stiffness, per second². Higher chases harder. */
+const STEER = 2.6;
+/** Damping, per second. Under-damped on purpose: it is what produces the drift. */
+const DAMP = 1.55;
+/** Speed beyond which the vehicle stops accelerating, in Earth radii per second. */
+const SPEED_LIMIT = 9.0;
+
+/** How fast the station orbit sweeps, radians per second. */
+const ORBIT_RATE = 0.16;
 
 /** World position of a station: its coordinate, lifted to its own altitude. */
 export function stationPosition(waypoint: Waypoint, target = new THREE.Vector3()): THREE.Vector3 {
@@ -58,9 +72,9 @@ export function stationPosition(waypoint: Waypoint, target = new THREE.Vector3()
  * East–north–up at a point on the globe.
  *
  * The degenerate case is a station directly over a pole, where "east" is
- * undefined. It is nudged to the prime meridian rather than left to produce a
- * zero-length cross product, which would collapse the basis and send the camera
- * to NaN for the rest of the session.
+ * undefined. It is nudged rather than left to produce a zero-length cross
+ * product, which would collapse the basis and send the vehicle to NaN for the
+ * rest of the session.
  */
 function localFrame(position: THREE.Vector3, up: THREE.Vector3, east: THREE.Vector3, north: THREE.Vector3): void {
   up.copy(position).normalize();
@@ -79,9 +93,8 @@ export interface RigProps {
    * Hand the field of view to the station's own scene.
    *
    * ضيقاً حرجاً drives the camera's FOV itself — the contraction of the view IS
-   * the phenomenon, not a decoration on top of it. If the rig also wrote the FOV
-   * the two would fight every frame and the result would be a visible flutter.
-   * So while such a scene stands, the rig stops writing it.
+   * the phenomenon. If the rig also wrote it the two would fight every frame and
+   * the result would be a visible flutter.
    */
   cedeFov?: boolean;
   /** Receives the station's world position each frame, for L4 and the scene mount. */
@@ -93,20 +106,24 @@ export function JourneyRig({ nav, waypoint, previous, orientation, cedeFov, onSt
 
   const scratch = useMemo(() => ({
     station: new THREE.Vector3(),
-    travelling: new THREE.Vector3(),
-    ahead: new THREE.Vector3(),
+    desired: new THREE.Vector3(),
+    look: new THREE.Vector3(),
+    steer: new THREE.Vector3(),
+    lateral: new THREE.Vector3(),
     up: new THREE.Vector3(),
     east: new THREE.Vector3(),
     north: new THREE.Vector3(),
-    desired: new THREE.Vector3(),
-    look: new THREE.Vector3(),
-    offset: new THREE.Vector3(),
+    along: new THREE.Vector3(),
+    previousVelocity: new THREE.Vector3(),
+    lead: new THREE.Vector3(),
   }), []);
 
-  const smoothed = useRef({ look: new THREE.Vector3(0, 0, 0), fov: 55, roll: 0, started: false });
+  const state = useRef({ orbit: Math.random() * Math.PI * 2, fov: 62, started: false });
 
   useFrame((_, delta) => {
-    const dt = Math.min(delta, 0.1);
+    // A backgrounded tab returns with a delta of seconds; integrating it would
+    // fire the vehicle out of the solar system.
+    const dt = Math.min(delta, 1 / 20);
     const s = scratch;
 
     stationPosition(waypoint, s.station);
@@ -114,82 +131,121 @@ export function JourneyRig({ nav, waypoint, previous, orientation, cedeFov, onSt
 
     const transit = Math.min(1, nav.leg / TRANSIT_FRACTION);
     const arrived = nav.leg >= TRANSIT_FRACTION;
+    const spec = orientation ? ORIENTATIONS[orientation] : null;
 
     if (!arrived) {
-      // --- in flight: on the great circle, at the navigator's arc altitude ---
-      const here = interpolate(previous.at, waypoint.at, transit);
-      // A point slightly further along the same arc gives the tangent without
-      // differentiating anything — and it is the point the camera looks at, so
-      // the view is along the track rather than at the ground under it.
-      const soon = interpolate(previous.at, waypoint.at, Math.min(1, transit + 0.035));
+      // ---- in flight -------------------------------------------------------
+      // On the great circle, at the navigator's arc altitude. The destination
+      // runs ahead of the vehicle rather than sitting on it, so the steering
+      // force is always forward and the flight never decelerates into its own
+      // target mid-leg.
+      const ahead = Math.min(1, transit + 0.10);
+      const altitude = EARTH_RADIUS + nav.altitude * 0.85 + 0.30;
+      toVector(interpolate(previous.at, waypoint.at, ahead), altitude, s.desired);
 
-      toVector(here, EARTH_RADIUS + nav.altitude * 0.55 + 0.22, s.travelling);
-      toVector(soon, EARTH_RADIUS + nav.altitude * 0.55 + 0.22, s.ahead);
-
-      s.desired.copy(s.travelling);
-      // Look ahead early in the leg, and swing toward the station as it nears,
-      // so arrival is a turn onto the target rather than a cut.
-      s.look.copy(s.ahead).lerp(s.station, THREE.MathUtils.smoothstep(transit, 0.55, 1));
+      // Look further ahead still, and swing onto the station as it nears, so
+      // arrival is a turn rather than a cut.
+      toVector(interpolate(previous.at, waypoint.at, Math.min(1, transit + 0.22)), altitude, s.look);
+      s.look.lerp(s.station, THREE.MathUtils.smoothstep(transit, 0.6, 1));
     } else {
-      // --- on station: the orientation decides where the observer stands -----
-      const spec = orientation ? ORIENTATIONS[orientation] : null;
-      const distance = (spec?.distance ?? 1.35) * SCENE_CORE * STATION_SCALE + 0.55;
-      const elevation = (spec?.elevation ?? 8) * DEG;
+      // ---- on station ------------------------------------------------------
+      // A slow orbit, not a fixed offset. The orbit is what keeps parallax
+      // alive while the ayah plays out; a stationary camera here was the single
+      // biggest reason the whole thing felt like a rig rather than a flight.
+      state.current.orbit += dt * ORBIT_RATE;
+
+      const distance = (spec?.distance ?? 1.6) * SCENE_CORE * STATION_SCALE + 0.9;
+      const elevation = (spec?.elevation ?? 10) * DEG;
 
       localFrame(s.station, s.up, s.east, s.north);
-
-      // Approach bearing: the direction the traveller arrived from. Standing
-      // opposite it means the station is met head-on rather than from behind.
-      const from = toVector(previous.at, 1, s.offset).sub(s.station.clone().normalize()).normalize();
-      const along = s.east.clone().multiplyScalar(from.dot(s.east))
-        .add(s.north.clone().multiplyScalar(from.dot(s.north)));
-      if (along.lengthSq() < 1e-8) along.copy(s.east);
-      along.normalize();
+      const swing = state.current.orbit;
 
       s.desired.copy(s.station)
         .addScaledVector(s.up, Math.sin(elevation) * distance)
-        .addScaledVector(along, Math.cos(elevation) * distance);
+        .addScaledVector(s.east, Math.cos(elevation) * Math.cos(swing) * distance)
+        .addScaledVector(s.north, Math.cos(elevation) * Math.sin(swing) * distance);
 
-      s.look.copy(s.station);
+      // Look slightly past the station along the orbit, so the head leads the
+      // body through the turn instead of staring rigidly at the centre.
+      s.look.copy(s.station).addScaledVector(
+        s.east.clone().multiplyScalar(-Math.sin(swing)).add(s.north.clone().multiplyScalar(Math.cos(swing))),
+        distance * 0.18,
+      );
     }
 
-    // --- approach, never assign ---------------------------------------------
-    // 1 − e^(−k·dt) is the frame-rate-correct form of an exponential approach.
-    // A bare `lerp(x, 0.1)` moves twice as fast at 120 Hz as at 60.
-    const rate = 1 - Math.exp(-(arrived ? 2.4 : 3.6) * dt);
-    if (!smoothed.current.started) {
-      camera.position.copy(s.desired);
-      smoothed.current.look.copy(s.look);
-      smoothed.current.started = true;
-    } else {
-      camera.position.lerp(s.desired, rate);
-      smoothed.current.look.lerp(s.look, rate);
+    // ---- integrate ---------------------------------------------------------
+    if (!state.current.started) {
+      flight.position.copy(s.desired);
+      flight.target.copy(s.look);
+      flight.velocity.set(0, 0, 0);
+      state.current.started = true;
     }
 
-    const spec = orientation ? ORIENTATIONS[orientation] : null;
-    const targetFov = spec?.fov ?? 58;
-    const targetRoll = (spec?.roll ?? 0) * DEG + nav.bank;
+    s.previousVelocity.copy(flight.velocity);
 
-    smoothed.current.fov += (targetFov - smoothed.current.fov) * rate;
-    smoothed.current.roll += (targetRoll - smoothed.current.roll) * rate;
+    // Spring toward the destination, damped by the current velocity. Critical
+    // damping would be 2·√STEER ≈ 3.2; at 1.55 the vehicle is deliberately
+    // under-damped, which is what makes it drift past and ease back rather than
+    // arrive and stop.
+    s.steer.copy(s.desired).sub(flight.position).multiplyScalar(STEER)
+      .addScaledVector(flight.velocity, -DAMP);
 
-    // Track the camera's own value while ceding, so that when the scene hands
-    // the FOV back the rig resumes from where the scene left it rather than
-    // snapping to the value it would have reached on its own.
-    if (cedeFov) smoothed.current.fov = camera.fov;
-    else if (Math.abs(camera.fov - smoothed.current.fov) > 0.01) {
-      camera.fov = smoothed.current.fov;
-      camera.updateProjectionMatrix();
-    }
+    flight.velocity.addScaledVector(s.steer, dt);
+    if (flight.velocity.length() > SPEED_LIMIT) flight.velocity.setLength(SPEED_LIMIT);
+    flight.position.addScaledVector(flight.velocity, dt);
 
-    // Up-vector: the local vertical, rolled. Using world-up instead would make
-    // the horizon tumble whenever the journey crosses a pole.
+    flight.speed = flight.velocity.length();
+    // ~1 s time constant, frame-rate corrected.
+    flight.smoothSpeed += (flight.speed - flight.smoothSpeed) * (1 - Math.exp(-dt));
+
+    if (flight.speed > 1e-4) flight.heading.copy(flight.velocity).divideScalar(flight.speed);
+
+    // The look target eases rather than snapping, so a change of destination is
+    // a turn of the head and not a cut.
+    flight.target.lerp(s.look, 1 - Math.exp(-3.2 * dt));
+
+    // ---- bank --------------------------------------------------------------
+    // Roll into the lateral component of acceleration: the part of the velocity
+    // change that is perpendicular to where the nose points. This is why a turn
+    // reads as a turn and not as a sideways slide.
+    s.lateral.copy(flight.velocity).sub(s.previousVelocity);
+    if (dt > 0) s.lateral.divideScalar(dt);
+    s.lateral.addScaledVector(flight.heading, -s.lateral.dot(flight.heading));
+
+    localFrame(flight.position, s.up, s.east, s.north);
+    const rightward = s.lateral.dot(s.up.clone().cross(flight.heading).normalize());
+    const bank = THREE.MathUtils.clamp(rightward * 0.055, -0.5, 0.5) + nav.bank * 0.4
+      + (spec?.roll ?? 0) * DEG;
+    flight.roll += (bank - flight.roll) * (1 - Math.exp(-2.2 * dt));
+
+    // ---- apply to the camera ----------------------------------------------
+    camera.position.copy(flight.position);
+
+    // Up is the local vertical, rolled about the view axis. World-up instead
+    // would tumble the horizon every time the journey crosses a pole.
     localFrame(camera.position, s.up, s.east, s.north);
-    camera.up.copy(s.up).applyAxisAngle(
-      s.look.clone().sub(camera.position).normalize(),
-      smoothed.current.roll,
-    );
-    camera.lookAt(smoothed.current.look);
+    s.lead.copy(flight.target).sub(camera.position);
+    if (s.lead.lengthSq() < 1e-8) s.lead.copy(flight.heading);
+    s.lead.normalize();
+    camera.up.copy(s.up).applyAxisAngle(s.lead, flight.roll);
+    camera.lookAt(flight.target);
+
+    // ---- field of view -----------------------------------------------------
+    // Opens with speed. This is the oldest trick for conveying velocity and it
+    // works because it is what a real widening field does to peripheral flow —
+    // the edges of the frame accelerate more than the centre.
+    if (!cedeFov) {
+      const base = spec?.fov ?? 62;
+      const target = base + THREE.MathUtils.clamp(flight.smoothSpeed / CRUISE_SPEED, 0, 1.6) * 16;
+      state.current.fov += (target - state.current.fov) * (1 - Math.exp(-1.8 * dt));
+      if (Math.abs(camera.fov - state.current.fov) > 0.02) {
+        camera.fov = state.current.fov;
+        camera.updateProjectionMatrix();
+      }
+    } else {
+      // Track what the scene is doing, so the rig resumes from there.
+      state.current.fov = camera.fov;
+    }
   });
 
   return null;
@@ -212,8 +268,8 @@ export function Track({ from, to, progress, accent }: {
 
     for (let index = 0; index <= SEGMENTS; index += 1) {
       const t = index / SEGMENTS;
-      // The track is drawn just off the surface, following the arc the vehicle
-      // flies rather than lying flat on the globe.
+      // The track follows the arc the vehicle flies rather than lying flat on
+      // the globe.
       const lift = Math.sin(Math.PI * t) * 0.06;
       toVector(interpolate(from.at, to.at, t), EARTH_RADIUS + 0.004 + lift, point);
       positions.set([point.x, point.y, point.z], index * 3);
@@ -257,7 +313,7 @@ export function Track({ from, to, progress, accent }: {
           void main() {
             float flown = step(vFraction, uProgress);
             float head = exp(-abs(vFraction - uProgress) * 42.0);
-            float alpha = 0.10 + flown * 0.42 + head * 0.9;
+            float alpha = 0.08 + flown * 0.34 + head * 0.9;
             gl_FragColor = vec4(uAccent * (0.7 + head), alpha);
           }
         `}

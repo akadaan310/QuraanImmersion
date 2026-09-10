@@ -3,15 +3,17 @@
 @tailwind utilities;
 
 /*
- * The interface is four elements: the readout, the ayah, the trail of offered
- * orientations, and the markers standing in the world. Everything else on screen
- * is the universe.
+ * The interface is four elements: the ayah, the readout, the control bar along
+ * the bottom edge, and the drawer it opens. Everything else on screen is the
+ * universe.
  *
- * The layering rule that matters: the gesture surface must sit BELOW the
- * orientation markers. The markers are DOM nodes portalled over the canvas by
- * drei's Html at z-index 20–40; the gesture surface takes 10, so a tap on a
- * marker reaches the marker and a tap on empty space reaches the surface. Invert
- * that and the only controls in the application become untappable.
+ * The layering rule that matters: the gesture surface (z 10) sits BELOW the bar
+ * and the drawer (z 30, 40), so a tap on a control reaches the control and a tap
+ * on the field reaches the field. Invert that and every control in the
+ * application becomes untappable.
+ *
+ * Bottom-heavy on purpose. A phone is held low and the top of a 6.8" screen is
+ * out of thumb reach, so nothing above the drawer is ever interactive.
  */
 
 @layer base {
@@ -80,7 +82,8 @@
     position: fixed;
     z-index: 15;
     inset-inline: 0;
-    bottom: calc(var(--edge-bottom) + 58px);
+    /* Clear of the control bar, which is the one thing it must never sit under. */
+    bottom: calc(var(--edge-bottom) + 92px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -166,107 +169,6 @@
     color: rgba(34, 211, 238, 0.5);
   }
 
-  /* -------------------------------------------------------------- the trail */
-
-  .isnaad-trail {
-    position: fixed;
-    z-index: 15;
-    inset-inline: 0;
-    bottom: var(--edge-bottom);
-    display: flex;
-    justify-content: center;
-    gap: 14px;
-    pointer-events: none;
-  }
-
-  .isnaad-trail__dot {
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
-    padding: 3px 9px;
-    border-radius: 999px;
-    border: 1px solid rgba(34, 211, 238, 0.14);
-    color: rgba(148, 163, 184, 0.5);
-    background: rgba(1, 3, 10, 0.5);
-    transition: color 220ms ease, border-color 220ms ease, transform 220ms ease;
-  }
-
-  .isnaad-trail__dot.is-focused {
-    color: var(--cyan);
-    border-color: rgba(34, 211, 238, 0.55);
-    transform: translateY(-2px);
-  }
-
-  .isnaad-trail__dot.is-adopted {
-    color: #01030a;
-    background: var(--cyan);
-    border-color: var(--cyan);
-  }
-
-  /* ---------------------------------------------------- orientation markers */
-
-  .isnaad-orientation {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 10px 14px;
-    border-radius: 999px;
-    border: 1px solid rgba(34, 211, 238, 0.28);
-    background: rgba(1, 3, 10, 0.62);
-    backdrop-filter: blur(3px);
-    color: rgba(226, 232, 240, 0.82);
-    font-family: inherit;
-    cursor: pointer;
-    white-space: nowrap;
-    /* A phone-sized tap target, whatever the marker's rendered scale. */
-    min-width: 56px;
-    transition: border-color 200ms ease, background 200ms ease, transform 200ms ease;
-  }
-
-  .isnaad-orientation__sigil {
-    font-size: 0.92rem;
-    letter-spacing: 0.12em;
-  }
-
-  /*
-   * Only the focused or adopted marker carries its full name.
-   *
-   * With every marker labelled, four of them at the scale the camera gives them
-   * overlapped each other on a short viewport and ran off the side on a narrow
-   * one. They are also four labels competing with the ayah for attention in an
-   * interface whose whole point is the field. The sigil identifies the marker;
-   * the name appears for the one the observer is actually choosing.
-   */
-  .isnaad-orientation__name {
-    display: none;
-    font-size: 0.5rem;
-    letter-spacing: 0.06em;
-    color: rgba(148, 163, 184, 0.6);
-    max-width: 6.5rem;
-    white-space: normal;
-    text-align: center;
-  }
-
-  .isnaad-orientation.is-focused .isnaad-orientation__name,
-  .isnaad-orientation.is-adopted .isnaad-orientation__name {
-    display: block;
-  }
-
-  .isnaad-orientation.is-focused {
-    border-color: rgba(34, 211, 238, 0.85);
-    transform: scale(1.08);
-    box-shadow: 0 0 22px -6px rgba(34, 211, 238, 0.8);
-  }
-
-  .isnaad-orientation.is-adopted {
-    background: rgba(34, 211, 238, 0.16);
-    border-color: var(--cyan);
-    color: #f0fdff;
-  }
-
-  .isnaad-orientation.is-adopted .isnaad-orientation__name {
-    color: rgba(224, 251, 255, 0.75);
-  }
 }
 
 @keyframes isnaad-breathe {
@@ -278,6 +180,269 @@
    interface animating at it. Everything that moves here is the universe. */
 @media (prefers-reduced-motion: reduce) {
   .isnaad-veil__gate { animation: none; opacity: 0.85; }
-  .isnaad-trail__dot,
-  .isnaad-orientation { transition: none; }
+  .isnaad-drawer { animation: none; }
+  .isnaad-bar__button,
+  .isnaad-row { transition: none; }
+}
+
+/*
+ * ── the control bar and the drawer ──────────────────────────────────────────
+ *
+ * These are appended after the Tailwind layers rather than inside
+ * `@layer components`, so their specificity is not competing with anything the
+ * framework emits. Nothing here uses a Tailwind utility; the interface is four
+ * components and hand-written CSS is shorter than the class strings would be.
+ */
+
+.isnaad-bar {
+  position: fixed;
+  z-index: 30;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  padding: 6px 8px calc(var(--edge-bottom));
+  background: linear-gradient(to top, rgba(1, 3, 10, 0.92) 55%, rgba(1, 3, 10, 0));
+  backdrop-filter: blur(8px);
+}
+
+.isnaad-bar__button {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  /* 48 px is the smallest reliable thumb target; the bar is the only place in
+     the application where a miss costs the observer anything. */
+  min-height: 48px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.9);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease;
+}
+
+.isnaad-bar__button:active { background: rgba(34, 211, 238, 0.1); }
+.isnaad-bar__button.is-open { background: rgba(34, 211, 238, 0.14); }
+
+.isnaad-bar__label {
+  font-size: 0.54rem;
+  letter-spacing: 0.16em;
+  color: rgba(34, 211, 238, 0.62);
+}
+
+.isnaad-bar__value {
+  font-size: 0.68rem;
+  max-width: 100%;
+  /* A surah name or a route title has to truncate rather than wrap: a bar whose
+     height changes with its content shifts the whole layout underneath it. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.isnaad-bar__button--transport { flex: 0 0 58px; }
+
+.isnaad-bar__glyph {
+  font-size: 0.94rem;
+  line-height: 1;
+  color: var(--cyan);
+}
+
+/* ------------------------------------------------------------------ drawer */
+
+.isnaad-drawer {
+  position: fixed;
+  z-index: 40;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  /* Never taller than two-thirds: the field stays visible behind it, and the
+     drawer reads as something drawn over the universe rather than a new page. */
+  max-height: 68vh;
+  padding: 0 12px calc(var(--edge-bottom) + 66px);
+  background: rgba(2, 6, 18, 0.94);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(34, 211, 238, 0.16);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -24px 60px -30px rgba(34, 211, 238, 0.5);
+  animation: isnaad-rise 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.isnaad-drawer__grip {
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.32);
+}
+
+.isnaad-drawer__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 4px 4px 8px;
+}
+
+.isnaad-drawer__title {
+  font-size: 0.82rem;
+  letter-spacing: 0.14em;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.isnaad-drawer__close {
+  border: 0;
+  background: transparent;
+  color: rgba(34, 211, 238, 0.75);
+  font-family: inherit;
+  font-size: 0.68rem;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.isnaad-drawer__note {
+  margin: 0 4px 8px;
+  font-size: 0.6rem;
+  line-height: 1.7;
+  color: var(--whisper);
+}
+
+.isnaad-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 2px 8px;
+}
+
+.isnaad-tab {
+  flex: 1 1 0;
+  padding: 7px 6px;
+  border: 1px solid rgba(34, 211, 238, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(148, 163, 184, 0.7);
+  font-family: inherit;
+  font-size: 0.62rem;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.isnaad-tab.is-active {
+  color: #01030a;
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.isnaad-search {
+  margin: 0 2px 8px;
+  padding: 9px 12px;
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: 10px;
+  background: rgba(1, 3, 10, 0.6);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.72rem;
+}
+
+.isnaad-search:focus {
+  outline: none;
+  border-color: rgba(34, 211, 238, 0.55);
+}
+
+.isnaad-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* The drawer scrolls; the page behind it must not. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+}
+
+.isnaad-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.86);
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.isnaad-row:active { background: rgba(34, 211, 238, 0.08); }
+.isnaad-row.is-active { background: rgba(34, 211, 238, 0.13); }
+
+.isnaad-row--compact { min-height: 38px; padding: 6px 10px; }
+
+.isnaad-row__mark {
+  flex: 0 0 3px;
+  align-self: stretch;
+  border-radius: 999px;
+  /* Each route carries its phenomenon's accent, so the list is scannable by
+     colour before it is read. */
+  background: var(--row-accent, rgba(34, 211, 238, 0.5));
+}
+
+.isnaad-row__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.isnaad-row__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.76rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.isnaad-row__brief {
+  font-size: 0.58rem;
+  line-height: 1.6;
+  color: var(--whisper);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.isnaad-row__count,
+.isnaad-row__index {
+  flex: 0 0 auto;
+  font-size: 0.58rem;
+  color: rgba(34, 211, 238, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.isnaad-row__index { min-width: 2.4rem; }
+
+.isnaad-readout__meter {
+  letter-spacing: 0.06em;
+  color: rgba(34, 211, 238, 0.75);
+}
+
+@keyframes isnaad-rise {
+  from { transform: translateY(14%); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
 }
